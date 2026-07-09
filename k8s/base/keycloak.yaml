@@ -1,0 +1,58 @@
+# Keycloak — importa o realm hospital no boot. KC_HOSTNAME fixa o issuer para
+# http://keycloak:8080/realms/hospital (consistente com o issuer-uri validado pelo Gateway).
+# ConfigMap keycloak-realm (realm-export.json) é gerado por `make deploy`.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  labels: { app: keycloak }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: keycloak }
+  template:
+    metadata:
+      labels: { app: keycloak }
+    spec:
+      containers:
+        - name: keycloak
+          image: quay.io/keycloak/keycloak:26.0
+          args: ["start-dev", "--import-realm"]
+          env:
+            - { name: KC_BOOTSTRAP_ADMIN_USERNAME, value: admin }
+            - { name: KC_BOOTSTRAP_ADMIN_PASSWORD, value: admin }
+            - { name: KC_HEALTH_ENABLED,           value: "true" }
+            # Issuer estável (hostname v2 do KC 26): o iss do token é sempre este host.
+            - { name: KC_HOSTNAME,                 value: "http://keycloak:8080" }
+          ports:
+            - { containerPort: 8080, name: http }
+            - { containerPort: 9000, name: management }
+          volumeMounts:
+            - { name: realm, mountPath: /opt/keycloak/data/import, readOnly: true }
+          # Health na porta de management (9000). O kubelet faz o HTTP — não precisa de curl no container.
+          readinessProbe:
+            httpGet: { path: /health/ready, port: 9000 }
+            initialDelaySeconds: 20
+            periodSeconds: 5
+            failureThreshold: 30
+          livenessProbe:
+            httpGet: { path: /health/live, port: 9000 }
+            initialDelaySeconds: 60
+            periodSeconds: 10
+          resources:
+            requests: { cpu: "250m", memory: "512Mi" }
+            limits:   { cpu: "1",    memory: "1Gi" }
+      volumes:
+        - name: realm
+          configMap: { name: keycloak-realm }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+  labels: { app: keycloak }
+spec:
+  type: ClusterIP
+  selector: { app: keycloak }
+  ports:
+    - { name: http, port: 8080, targetPort: 8080 }

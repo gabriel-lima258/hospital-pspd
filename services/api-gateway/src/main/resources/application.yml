@@ -1,0 +1,40 @@
+spring:
+  application:
+    name: api-gateway
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Validação de JWT contra o Keycloak (§4.7). O JwtDecoder em SecurityConfig lê este valor
+          # e resolve o issuer de forma lazy (não acopla o boot do Gateway ao Keycloak).
+          issuer-uri: http://keycloak:8080/realms/hospital
+
+# gRPC CLIENT (net.devh) — canais criados lazy na 1ª injeção de stub (sem conexão no boot).
+grpc:
+  client:
+    authorization:
+      address: 'dns:///authorization:9090'
+      negotiationType: plaintext
+    patient-data:
+      address: 'dns:///patient-data:9090'
+      negotiationType: plaintext
+    data-transform:
+      address: 'dns:///data-transform:9090'
+      negotiationType: plaintext
+
+# Observabilidade (§4.5): expõe /actuator/prometheus, tag por serviço e histograma p/ p95/p99.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+
+# Único serviço publicado (REST/HTTP).
+server:
+  port: 9000

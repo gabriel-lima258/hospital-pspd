@@ -1,0 +1,30 @@
+// Data Transform Service — domínio rico (anonimização/agregação/FHIR).
+plugins {
+    id 'java'
+    id 'org.springframework.boot'
+    id 'io.spring.dependency-management'
+}
+
+dependencies {
+    implementation project(':proto')
+
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'io.micrometer:micrometer-registry-prometheus'
+
+    // gRPC SERVER (adapter de entrada). Sem JPA/Postgres (é stateless).
+    implementation 'net.devh:grpc-server-spring-boot-starter:3.1.0.RELEASE'
+
+    // Testes de unidade do domínio (JUnit 5 puro — sem Spring). Versões pelo Spring BOM.
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testImplementation 'org.assertj:assertj-core'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+bootJar {
+    archiveFileName = 'app.jar'
+}

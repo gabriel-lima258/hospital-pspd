@@ -1,0 +1,60 @@
+// Módulo :proto — contrato gRPC compartilhado (fonte da verdade).
+// Gera stubs Java (mensagens) + gRPC (serviços) a partir de proto/hospital.proto.
+// Os 4 serviços consomem via `implementation project(':proto')`.
+plugins {
+    id 'java-library'
+    id 'com.google.protobuf' version '0.9.4'
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+// O contrato mora em proto/hospital.proto (raiz do módulo), então o srcDir do proto é '.'.
+// Consequência: '.' entra no --proto_path do protoc. Se o build/ deste módulo ficasse aninhado
+// em '.', os protos extraídos das dependências (build/extracted-include-protos/.../google/api)
+// seriam resolvidos por dois caminhos e dariam "already defined". Movendo o build para fora do
+// módulo, a raiz '.' passa a conter só o hospital.proto e o conflito some.
+layout.buildDirectory = file("${rootProject.projectDir}/build/proto")
+
+dependencies {
+    // Exportadas (api) para que os serviços que dependem de :proto vejam os tipos gerados.
+    api "com.google.protobuf:protobuf-java:${protobufVersion}"
+    api "io.grpc:grpc-protobuf:${grpcVersion}"
+    api "io.grpc:grpc-stub:${grpcVersion}"
+    // NÃO exportar grpc-netty-shaded: o transporte netty vem do net.devh grpc starter em cada serviço.
+    // Exportá-lo aqui duplicaria o netty no classpath dos serviços (armadilha citada no enunciado).
+
+    // Necessário para a anotação javax.annotation.Generated usada nos stubs gRPC no Java moderno.
+    compileOnly 'org.apache.tomcat:annotations-api:6.0.53'
+}
+
+// O .proto mora em proto/hospital.proto (raiz do módulo), conforme §2.4/§4.6 do roteiro,
+// e não no default src/main/proto — por isso apontamos o srcDir para a raiz do módulo.
+// include '*.proto' garante que só os contratos do nível-raiz sejam compilados como fonte.
+sourceSets {
+    main {
+        proto {
+            srcDir '.'
+            include '*.proto'
+        }
+    }
+}
+
+protobuf {
+    protoc {
+        artifact = "com.google.protobuf:protoc:${protobufVersion}"
+    }
+    plugins {
+        grpc {
+            artifact = "io.grpc:protoc-gen-grpc-java:${grpcVersion}"
+        }
+    }
+    generateProtoTasks {
+        all()*.plugins {
+            grpc {}
+        }
+    }
+}

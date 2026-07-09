@@ -1,0 +1,66 @@
+# PostgreSQL — 1 réplica stateful (gargalo esperado, §7.1). Service "db" mantém jdbc://db:5432.
+# O ConfigMap pg-initdb (schema.sql + seed-min.sql) é gerado por `make deploy` a partir dos arquivos-fonte.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: db-data
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db
+  labels: { app: db }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: db }
+  template:
+    metadata:
+      labels: { app: db }
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16
+          env:
+            - { name: POSTGRES_DB,       value: hospital }
+            - { name: POSTGRES_USER,     value: app }
+            - { name: POSTGRES_PASSWORD, value: app }
+            # PGDATA em subdir do volume evita conflito com lost+found do PVC.
+            - { name: PGDATA,            value: /var/lib/postgresql/data/pgdata }
+          ports:
+            - { containerPort: 5432, name: postgres }
+          volumeMounts:
+            - { name: data,    mountPath: /var/lib/postgresql/data }
+            - { name: initdb,  mountPath: /docker-entrypoint-initdb.d }
+          readinessProbe:
+            exec: { command: ["pg_isready", "-U", "app", "-d", "hospital"] }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec: { command: ["pg_isready", "-U", "app", "-d", "hospital"] }
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            requests: { cpu: "250m", memory: "256Mi" }
+            limits:   { cpu: "500m", memory: "512Mi" }
+      volumes:
+        - name: data
+          persistentVolumeClaim: { claimName: db-data }
+        - name: initdb
+          configMap: { name: pg-initdb }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db
+  labels: { app: db }
+spec:
+  type: ClusterIP
+  selector: { app: db }
+  ports:
+    - { name: postgres, port: 5432, targetPort: 5432 }

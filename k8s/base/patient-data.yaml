@@ -1,0 +1,47 @@
+# Patient Data — gRPC server (9090) + actuator/métrica (8080). Lê o Postgres (db:5432, via application.yml).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: patient-data
+  labels: { app: patient-data }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: patient-data }
+  template:
+    metadata:
+      labels: { app: patient-data }
+    spec:
+      containers:
+        - name: patient-data
+          image: hospital/patient-data:dev
+          imagePullPolicy: IfNotPresent
+          ports:
+            - { containerPort: 8080, name: http }
+            - { containerPort: 9090, name: grpc }
+          readinessProbe:
+            httpGet: { path: /actuator/health, port: 8080 }
+            initialDelaySeconds: 15
+            periodSeconds: 5
+            failureThreshold: 12
+          livenessProbe:
+            httpGet: { path: /actuator/health, port: 8080 }
+            initialDelaySeconds: 40
+            periodSeconds: 10
+          resources:
+            requests: { cpu: "250m", memory: "512Mi" }   # requests.cpu obrigatório p/ o HPA (D5)
+            limits:   { cpu: "1",    memory: "1Gi" }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: patient-data
+  labels:
+    app: patient-data
+    monitored: "true"
+spec:
+  type: ClusterIP
+  selector: { app: patient-data }
+  ports:
+    - { name: http, port: 8080, targetPort: 8080 }
+    - { name: grpc, port: 9090, targetPort: 9090 }

@@ -1,0 +1,47 @@
+# Job de seed: popula o Postgres do cluster (db:5432) com volume de teste (§4.4).
+# O volume NÃO cabe em ConfigMap — quem popula é este Job; o ConfigMap `seed-script`
+# (gerado no `make seed` a partir de db/seed.py) carrega só o script (~alguns KB).
+# imagem python + faker/psycopg2-binary instalados no start (Job efêmero).
+# SCALE_PLACEHOLDER é trocado pelo `make seed` (default 50000).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: seed
+  namespace: default
+spec:
+  backoffLimit: 1
+  ttlSecondsAfterFinished: 300   # auto-limpa o Job 5 min após terminar
+  template:
+    metadata:
+      labels:
+        app: seed
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: seed
+          image: python:3.12-slim
+          command: ["sh", "-c"]
+          args:
+            - >-
+              pip install --no-cache-dir --quiet faker psycopg2-binary &&
+              python /seed/seed.py --scale SCALE_PLACEHOLDER
+          env:
+            - { name: PGHOST,     value: "db" }
+            - { name: PGPORT,     value: "5432" }
+            - { name: PGDATABASE, value: "hospital" }
+            - { name: PGUSER,     value: "app" }
+            - { name: PGPASSWORD, value: "app" }
+          volumeMounts:
+            - name: seed-script
+              mountPath: /seed
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+      volumes:
+        - name: seed-script
+          configMap:
+            name: seed-script

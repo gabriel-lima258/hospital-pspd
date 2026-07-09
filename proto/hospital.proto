@@ -1,0 +1,51 @@
+// Contrato gRPC do Hospital Universitário (PSPD/UnB) — fonte da verdade (congelado no Dia 1, §4.6).
+// Comunicação Gateway → serviços em gRPC/HTTP-2 (Figura 1 do enunciado).
+// Servidor: anotar @GrpcService no adapter. Cliente: injetar stub com @GrpcClient("<nome>").
+syntax = "proto3";
+
+option java_multiple_files = true;
+package hospital;
+
+// ── Authorization Service ────────────────────────────────────────────────────
+// Decide ALLOW/DENY + nível de acesso a partir do perfil e dos vínculos/projetos.
+message AuthzRequest {
+  string username      = 1;  // preferred_username do JWT
+  string role          = 2;  // MEDICO | ESTAGIARIO | PESQUISADOR
+  string tipo_consulta = 3;  // ex.: Patient | Cohort
+  string patient_id    = 4;  // alvo individual (opcional)
+  string projeto_id    = 5;  // alvo de coorte/pesquisa (opcional)
+}
+message AuthzReply {
+  bool   allow = 1;
+  string nivel = 2;          // FULL | PARTIAL | ANONYMIZED | AGGREGATED
+}
+service Authorization {
+  rpc Check(AuthzRequest) returns (AuthzReply);
+}
+
+// ── Patient Data Service ─────────────────────────────────────────────────────
+// Consultas SQL e agregações do prontuário; devolve dados clínicos crus serializados.
+message PatientQuery {
+  string patient_id    = 1;
+  string coorte_codigo = 2;  // condição da coorte (ex.: Diabetes)
+  string tipo_consulta = 3;
+}
+message ClinicalData {
+  string json_payload = 1;   // dados clínicos crus (JSON serializado)
+}
+service PatientData {
+  rpc Fetch(PatientQuery) returns (ClinicalData);
+}
+
+// ── Data Transform Service ───────────────────────────────────────────────────
+// Anonimização, agregação e conversão para HL7/FHIR conforme o nível autorizado.
+message TransformRequest {
+  string json_payload = 1;   // dados crus vindos do Patient Data
+  string nivel        = 2;   // FULL | PARTIAL | ANONYMIZED | AGGREGATED
+}
+message FhirReply {
+  string fhir_json = 1;      // recurso(s) FHIR resultante(s)
+}
+service DataTransform {
+  rpc ToFhir(TransformRequest) returns (FhirReply);
+}

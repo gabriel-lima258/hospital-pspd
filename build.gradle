@@ -1,0 +1,21 @@
+// Declaramos os plugins do ecossistema Spring Boot na raiz com `apply false` para fixar as versões
+// num só lugar; cada serviço os aplica sem repetir versão. O :proto não usa nenhum deles.
+plugins {
+    id 'org.springframework.boot' version '3.3.5' apply false
+    id 'io.spring.dependency-management' version '1.1.6' apply false
+}
+
+// Configuração raiz mínima comum a todos os módulos.
+subprojects {
+    apply plugin: 'java'
+
+    java {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(21)
+        }
+    }
+
+    repositories {
+        mavenCentral()
+    }
+}

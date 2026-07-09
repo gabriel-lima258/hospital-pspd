@@ -1,0 +1,95 @@
+{
+  "realm": "hospital",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+
+  "accessTokenLifespan": 1800,
+  "accessTokenLifespanForImplicitFlow": 1800,
+  "ssoSessionIdleTimeout": 3600,
+  "ssoSessionMaxLifespan": 36000,
+
+  "roles": {
+    "realm": [
+      { "name": "MEDICO",      "description": "Medico — acesso FULL a pacientes vinculados" },
+      { "name": "ESTAGIARIO",  "description": "Estagiario — acesso PARTIAL a pacientes supervisionados" },
+      { "name": "PESQUISADOR", "description": "Pesquisador — acesso ANONYMIZED/AGGREGATED a projetos vigentes" }
+    ]
+  },
+
+  "clients": [
+    {
+      "clientId": "hospital-loadtest",
+      "name": "Client de carga/CLI (password grant p/ curl e k6)",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "fullScopeAllowed": true,
+      "redirectUris": [],
+      "webOrigins": []
+    },
+    {
+      "clientId": "hospital-frontend",
+      "name": "Frontend React/Next (Standard Flow / Authorization Code)",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "fullScopeAllowed": true,
+      "redirectUris": ["http://localhost:*"],
+      "webOrigins": ["http://localhost:*"]
+    }
+  ],
+
+  "users": [
+    {
+      "username": "med.cardoso",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Carlos",
+      "lastName": "Cardoso",
+      "email": "med.cardoso@hospital.local",
+      "credentials": [ { "type": "password", "value": "senha123", "temporary": false } ],
+      "realmRoles": ["MEDICO"]
+    },
+    {
+      "username": "est.almeida",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Ana",
+      "lastName": "Almeida",
+      "email": "est.almeida@hospital.local",
+      "credentials": [ { "type": "password", "value": "senha123", "temporary": false } ],
+      "realmRoles": ["ESTAGIARIO"]
+    },
+    {
+      "username": "pesq.souza",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Pedro",
+      "lastName": "Souza",
+      "email": "pesq.souza@hospital.local",
+      "credentials": [ { "type": "password", "value": "senha123", "temporary": false } ],
+      "realmRoles": ["PESQUISADOR"]
+    },
+    {
+      "username": "med.semvinculo",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Marta",
+      "lastName": "SemVinculo",
+      "email": "med.semvinculo@hospital.local",
+      "credentials": [ { "type": "password", "value": "senha123", "temporary": false } ],
+      "realmRoles": ["MEDICO"]
+    }
+  ]
+}

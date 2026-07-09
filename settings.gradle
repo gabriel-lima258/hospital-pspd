@@ -1,0 +1,10 @@
+// Monorepo Gradle multi-project — Hospital Universitário (PSPD/UnB)
+// :proto é o módulo compartilhado (contrato gRPC, fonte da verdade).
+// Os 4 serviços dependem dele via `implementation project(':proto')`.
+rootProject.name = 'hospital-pspd'
+
+include ':proto'
+include ':services:api-gateway'
+include ':services:authorization'
+include ':services:patient-data'
+include ':services:data-transform'

@@ -1,0 +1,35 @@
+// Authorization Service — domínio rico (matriz de acesso). Scaffold D2: só sobe + expõe métricas.
+plugins {
+    id 'java'
+    id 'org.springframework.boot'
+    id 'io.spring.dependency-management'
+}
+
+dependencies {
+    implementation project(':proto')
+
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'io.micrometer:micrometer-registry-prometheus'
+
+    // gRPC SERVER (adapter de entrada — @GrpcService virá na lógica).
+    implementation 'net.devh:grpc-server-spring-boot-starter:3.1.0.RELEASE'
+
+    // Persistência (lê user_patient_assignments / projects — sem entidades ainda).
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    runtimeOnly 'org.postgresql:postgresql'
+
+    // Testes de unidade do domínio (JUnit 5 puro — sem Spring). Versões pelo Spring BOM.
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testImplementation 'org.assertj:assertj-core'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+// Saída padronizada p/ o Dockerfile (§4.5).
+bootJar {
+    archiveFileName = 'app.jar'
+}

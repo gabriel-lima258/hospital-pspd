@@ -1,0 +1,45 @@
+# API Gateway — REST (9000). Único serviço acessado de fora (port-forward). Valida JWT e orquestra gRPC.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  labels: { app: api-gateway }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: api-gateway }
+  template:
+    metadata:
+      labels: { app: api-gateway }
+    spec:
+      containers:
+        - name: api-gateway
+          image: hospital/api-gateway:dev
+          imagePullPolicy: IfNotPresent
+          ports:
+            - { containerPort: 9000, name: http }
+          readinessProbe:
+            httpGet: { path: /actuator/health, port: 9000 }
+            initialDelaySeconds: 15
+            periodSeconds: 5
+            failureThreshold: 12
+          livenessProbe:
+            httpGet: { path: /actuator/health, port: 9000 }
+            initialDelaySeconds: 40
+            periodSeconds: 10
+          resources:
+            requests: { cpu: "250m", memory: "512Mi" }   # requests.cpu obrigatório p/ o HPA (D5)
+            limits:   { cpu: "1",    memory: "1Gi" }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+  labels:
+    app: api-gateway
+    monitored: "true"            # selecionado pelo ServiceMonitor
+spec:
+  type: ClusterIP
+  selector: { app: api-gateway }
+  ports:
+    - { name: http, port: 9000, targetPort: 9000 }   # porta de métrica nomeada "http"

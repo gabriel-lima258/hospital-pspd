@@ -1,0 +1,32 @@
+spring:
+  application:
+    name: authorization
+  datasource:
+    # Rede interna do compose/k8s: Postgres em db:5432 (o 5433 é só o mapeamento de host).
+    url: jdbc:postgresql://db:5432/hospital
+    username: app
+    password: app
+  jpa:
+    hibernate:
+      ddl-auto: none   # o schema vem de db/schema.sql; JPA não gerencia DDL
+
+# gRPC SERVER (net.devh) — porta separada do HTTP.
+grpc:
+  server:
+    port: 9090
+
+# Observabilidade (§4.5): expõe /actuator/prometheus, tag por serviço e histograma p/ p95/p99.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+
+server:
+  port: 8080

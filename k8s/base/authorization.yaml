@@ -1,0 +1,47 @@
+# Authorization — gRPC server (9090) + actuator/métrica (8080). Lê o Postgres (db:5432, via application.yml).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: authorization
+  labels: { app: authorization }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: authorization }
+  template:
+    metadata:
+      labels: { app: authorization }
+    spec:
+      containers:
+        - name: authorization
+          image: hospital/authorization:dev
+          imagePullPolicy: IfNotPresent
+          ports:
+            - { containerPort: 8080, name: http }
+            - { containerPort: 9090, name: grpc }
+          readinessProbe:
+            httpGet: { path: /actuator/health, port: 8080 }
+            initialDelaySeconds: 15
+            periodSeconds: 5
+            failureThreshold: 12
+          livenessProbe:
+            httpGet: { path: /actuator/health, port: 8080 }
+            initialDelaySeconds: 40
+            periodSeconds: 10
+          resources:
+            requests: { cpu: "250m", memory: "512Mi" }   # requests.cpu obrigatório p/ o HPA (D5)
+            limits:   { cpu: "1",    memory: "1Gi" }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: authorization
+  labels:
+    app: authorization
+    monitored: "true"
+spec:
+  type: ClusterIP
+  selector: { app: authorization }
+  ports:
+    - { name: http, port: 8080, targetPort: 8080 }   # métrica (scrape)
+    - { name: grpc, port: 9090, targetPort: 9090 }   # chamado pelo gateway (dns:///authorization:9090)

@@ -1,0 +1,10 @@
+# Cluster kind — 1 control-plane + 3 workers (§4.2 do roteiro).
+# Satisfaz o requisito "1 nó mestre + >=3 workers"; reprodutível com um comando.
+# Uso: kind create cluster --name pspd --config k8s/kind-config.yaml  (via `make cluster`)
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+  - role: worker
+  - role: worker
+  - role: worker

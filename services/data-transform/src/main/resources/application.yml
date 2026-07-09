@@ -1,0 +1,24 @@
+spring:
+  application:
+    name: data-transform
+
+# gRPC SERVER (net.devh) — porta separada do HTTP.
+grpc:
+  server:
+    port: 9090
+
+# Observabilidade (§4.5): expõe /actuator/prometheus, tag por serviço e histograma p/ p95/p99.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+
+server:
+  port: 8080

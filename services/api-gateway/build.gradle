@@ -1,0 +1,24 @@
+// API Gateway — adapter fino (REST → gRPC). Scaffold D2: sobe + métricas; SEM validação de JWT ainda.
+plugins {
+    id 'java'
+    id 'org.springframework.boot'
+    id 'io.spring.dependency-management'
+}
+
+dependencies {
+    implementation project(':proto')
+
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'io.micrometer:micrometer-registry-prometheus'
+
+    // Valida JWT do Keycloak (fiado no walking skeleton; aqui a dependência já entra p/ o esqueleto).
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
+
+    // gRPC CLIENT (net.devh) — injeta stubs p/ Authorization/PatientData/DataTransform.
+    implementation 'net.devh:grpc-client-spring-boot-starter:3.1.0.RELEASE'
+}
+
+bootJar {
+    archiveFileName = 'app.jar'
+}

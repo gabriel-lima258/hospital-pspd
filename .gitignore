@@ -1,0 +1,38 @@
+# ── Gradle / Java ────────────────────────────────────────────────────────────
+# Diretórios de saída de build. ATENÇÃO: ancore com barra inicial os nomes genéricos
+# ('out', 'bin') — sem a barra, 'out/' casava também com o pacote hexagonal
+# 'adapters/out/' e ignorava silenciosamente os repositórios (ports de saída)!
+.gradle/
+build/
+/out/
+/bin/
+*.class
+# Não ignorar o jar do wrapper (precisa estar versionado p/ o ./gradlew funcionar):
+!gradle/wrapper/gradle-wrapper.jar
+
+# ── IDEs ─────────────────────────────────────────────────────────────────────
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+
+# ── Python (seed.py, plot.py) ────────────────────────────────────────────────
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# ── Frontend ─────────────────────────────────────────────────────────────────
+node_modules/
+.next/
+dist/
+
+# ── Segredos / artefatos de carga ────────────────────────────────────────────
+loadtest/**/tokens.json
+
+# ── Ferramentas locais / SO ──────────────────────────────────────────────────
+.DS_Store
+# settings/comandos locais do Claude Code (gitignore não aceita comentário inline após o padrão)
+.claude/

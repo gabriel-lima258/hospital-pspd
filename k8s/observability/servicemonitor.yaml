@@ -1,0 +1,21 @@
+# Faz o Prometheus (kube-prometheus-stack) raspar os 4 serviços.
+# - label release: kps → casa com o serviceMonitorSelector do Prometheus do kps.
+# - selector monitored: "true" → os 4 Services rotulados.
+# - port: http → cobre 9000 (gateway) e 8080 (backends) de uma vez (mesmo nome de porta).
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: hospital-services
+  namespace: default
+  labels:
+    release: kps
+spec:
+  namespaceSelector:
+    matchNames: [default]
+  selector:
+    matchLabels:
+      monitored: "true"
+  endpoints:
+    - port: http
+      path: /actuator/prometheus
+      interval: 5s

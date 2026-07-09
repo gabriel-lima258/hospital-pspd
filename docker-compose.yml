@@ -1,0 +1,105 @@
+# Ambiente local (inner loop rápido, sem K8S) — Fase A do roteiro.
+# Postgres carrega db/schema.sql no primeiro boot; Keycloak sobe em dev mode.
+services:
+  db:
+    image: postgres:16
+    container_name: hospital-db
+    environment:
+      POSTGRES_DB: hospital
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+    ports:
+      - "5433:5432"
+    volumes:
+      # Executado apenas quando o volume de dados está vazio (primeiro boot).
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./db/seed-min.sql:/docker-entrypoint-initdb.d/02-seed-min.sql:ro
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d hospital"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    container_name: hospital-keycloak
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "8080:8080"
+    volumes:
+      # realm-export.json é gerado no P-keycloak (D1, trilha E). Enquanto não existir,
+      # o diretório é montado vazio e --import-realm simplesmente não importa nada.
+      - ./keycloak:/opt/keycloak/data/import:ro
+
+  # ── Microsserviços
+  # Build multi-stage com contexto = raiz do repo (monorepo Gradle precisa de settings.gradle + :proto).
+  authorization:
+    build:
+      context: .
+      dockerfile: services/authorization/Dockerfile
+    container_name: hospital-authorization
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 40s
+
+  patient-data:
+    build:
+      context: .
+      dockerfile: services/patient-data/Dockerfile
+    container_name: hospital-patient-data
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 40s
+
+  data-transform:
+    build:
+      context: .
+      dockerfile: services/data-transform/Dockerfile
+    container_name: hospital-data-transform
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 40s
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: services/api-gateway/Dockerfile
+    container_name: hospital-api-gateway
+    depends_on:
+      authorization:
+        condition: service_started
+      patient-data:
+        condition: service_started
+      data-transform:
+        condition: service_started
+    ports:
+      - "9000:9000"     # único serviço publicado no host (REST)
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9000/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 40s
+
+volumes:
+  pgdata:
