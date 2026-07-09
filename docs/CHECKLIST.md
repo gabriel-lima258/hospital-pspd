@@ -177,27 +177,29 @@ D — e o **frontend (🅴) é o primeiro a cortar** (§ordem de corte).
 ## 4. Backlog priorizado até a entrega (o "o que falta" acionável)
 
 > Ordem por impacto na nota. ⭐ = **caminho crítico dos 80%** (fases medidas com números).
+> O emoji no início é o **dono** (§0).
 
-1. **🔴 (P3c) Fechar o M2 — rota de coorte do pesquisador** _(Portão 3)_
+1. **🅲 🔴 (P3c) Fechar o M2 — rota de coorte do pesquisador** _(Portão 3)_
    - ~~**patient-data agregação/coorte**~~ ✅ **P3a** · ~~**data-transform por `nivel`**~~ ✅ **P3b** · ~~**FHIR completo**~~ ✅ **P3b**
    - **rota de coorte no gateway**: `projeto_id` → `codigo_condicao` → `PatientQuery.coorte_codigo` · `FhirPatientController`
    - ⚠️ **Mudança de contrato** a comunicar ao grupo: o `AuthzReply` precisa carregar `coorte_codigo`
      (o Authorization já lê `projects.codigo_condicao` para decidir; hoje não o devolve).
    - **DoD:** o pesquisador vê coorte AGG/ANON **pela rota REST**; as 3 jornadas validadas no cluster.
-2. **⭐🔴 gRPC round_robin** _(Portão 5, mas pré-requisito de qualquer carga com réplicas)_ — Service headless (`clusterIP: None`) + `defaultLoadBalancingPolicy: round_robin` no client.
-3. **⭐ HPA** _(Portão 5)_ — `k8s/base/hpa.yaml` (autoscaling/v2, min1/max10, CPU 60%).
-4. **⭐ loadtest + `make load`** _(Portão 4)_ — `scenario.js`, `run-load-tests.sh`, pool `tokens.json`, `collect-metrics.sh`; rodar `1replica`.
-5. **⭐ 3replicas + HPA medidos** _(Portão 5)_ — as duas baterias restantes.
-6. **⭐ Dashboards RED/USE** _(Portão 4)_ — JSON versionado + ≥5 métricas + screenshots.
-7. **⭐ `plot.py` + CSVs → PNGs** _(Portão 6)_ — gráficos comparativos.
-8. **➕ Tracing (OTel + Tempo)** _(Portão 6)_ — melhor ROI de bônus.
-9. **frontend mínimo** _(§9.1 / §9.7 · Portão 3+7)_ — **obrigatório, mas mínimo e P2** (baixo valor isolado; **primeiro a cortar** sob pressão — ordem de corte §R9: frontend rico → FHIR 100% → cenários extras).
+2. **🅰️ ⭐🔴 gRPC round_robin** _(Portão 5, mas pré-requisito de qualquer carga com réplicas)_ — Service headless (`clusterIP: None`) + `defaultLoadBalancingPolicy: round_robin` no client. **Bloqueia o item 5 do 🅳.**
+3. **🅰️ ⭐ HPA** _(Portão 5)_ — `k8s/base/hpa.yaml` (autoscaling/v2, min1/max10, CPU 60%).
+4. **🅳 ⭐ loadtest + `make load`** _(Portão 4)_ — `scenario.js`, `run-load-tests.sh`, pool `tokens.json`, `collect-metrics.sh`; rodar `1replica`.
+5. **🅳 ⭐ 3replicas + HPA medidos** _(Portão 5)_ — as duas baterias restantes. **Depende do item 2 (🅰️).**
+6. **🅴 ⭐ Dashboards RED/USE** _(Portão 4)_ — JSON versionado + ≥5 métricas + screenshots.
+7. **🅳 ⭐ `plot.py` + CSVs → PNGs** _(Portão 6)_ — gráficos comparativos.
+8. **🅴 ➕ Tracing (OTel + Tempo)** _(Portão 6)_ — melhor ROI de bônus.
+8b. **🅱️ Gateway maduro** _(Portão 4)_ — rate limiting + logging estruturado + erro gRPC→HTTP (hoje um `onError` vira 500 genérico); readiness que checa o DB.
+9. **🅴 frontend mínimo** _(§9.1 / §9.7 · Portão 3+7)_ — **obrigatório, mas mínimo e P2** (baixo valor isolado; **primeiro a cortar** sob pressão — ordem de corte §R9: frontend rico → FHIR 100% → cenários extras).
    - **Objetivo:** 1 SPA enxuta que autentica via **OAuth2/OIDC no Keycloak** (client `hospital-frontend`, Standard Flow) e faz as **3 consultas** (médico→FULL, estagiário→PARTIAL, pesquisador→coorte), renderizando conforme o nível retornado.
    - **Arquivos-alvo:** `frontend/` (hoje só `.gitkeep`) · client `hospital-frontend` já existe no `keycloak/realm-export.json` (`redirectUris`/`webOrigins` = `http://localhost:*`).
    - **DoD:** loga com `med.cardoso`/`est.almeida`/`pesq.souza`, envia `Authorization: Bearer` ao gateway, mostra as 3 respostas (inclusive um DENY→403). Serve principalmente ao **vídeo/demo (D7)**, não aos pontos técnicos.
    - **Depende de:** fechar o M2 (para as respostas por nível terem sentido) e, para o pesquisador, das rotas de coorte no gateway (ainda inexistentes).
-10. **`make demo`** _(Portão 2/7)_ — reprodução ponta-a-ponta.
-11. **Relatório §9 + vídeo** _(Portão 7)_ — escrever incrementalmente, não deixar p/ o fim.
+10. **🅰️ `make demo`** _(Portão 2/7)_ — reprodução ponta-a-ponta.
+11. **🅲 Relatório §9 + vídeo** _(Portão 7)_ — escrever incrementalmente, não deixar p/ o fim. Cada trilha entrega a sua seção; 🅲 consolida.
 
 ---
 
