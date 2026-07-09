@@ -152,25 +152,36 @@ D — e o **frontend (🅴) é o primeiro a cortar** (§ordem de corte).
 - [ ] 🅲 Zip no Moodle + código no GitHub com link no relatório
 - [ ] **todos** Checklist §9 100% marcado + autoavaliação por membro (com nota)
 
+**Roteiro do vídeo** (§9.4 — 5 alunos × 4–6 min; cada um abre com _"sou responsável por X, vou mostrar Y funcionando"_):
+
+| Bloco | Aluno | Mostra na tela |
+|---|---|---|
+| 1. Abertura + arquitetura | 🅴 **Guilherme** | login no frontend, JWT com role, jornada médico × pesquisador |
+| 2. Backend e regras de acesso | 🅱️ **Mateus** | REST→gRPC, validação de JWT, ALLOW+FULL e os **DENY** (sem vínculo, projeto expirado) |
+| 3. Dados, SQL e FHIR | 🅲 **Gabriel** | coorte/agregações, PARTIAL × ANONYMIZED, os 5 recursos FHIR, volume do seed |
+| 4. Cluster, escala e HPA | 🅰️ **Arthur** | 4 nós, `kubectl scale` 1→3, **HPA criando pods ao vivo** (`get hpa -w`) |
+| 5. Carga, métricas e descobertas | 🅳 **Carlos** | k6 rodando, Grafana ao vivo, gráficos comparativos, as **3 descobertas §7** |
+
 ---
 
 ## 3. Estado dos componentes (real × esperado)
 
-| Componente | Estado | Veredito | Ponteiro |
-|---|:--:|---|---|
-| **api-gateway** | 🟡 | JWT real + cadeia gRPC, mas **só a rota `/fhir/Patient/{id}`**; sem rate-limit/logging/erro gRPC | `FhirPatientController`, `SecurityConfig` |
-| **authorization** | ✅ | **Completo**: domínio puro + repos + gRPC + testes JUnit | `authorization/domain/*`, `adapters/*` |
-| **patient-data** | ✅ | **Completo** (P3a): prontuário individual + agregação de coorte + amostra de exames; testes JUnit | `PatientRepository`, `domain/Percentages` |
-| **data-transform** | ✅ | **Completo** (P3b): enforcement por `nivel` + 5 recursos FHIR + `MeasureReport`; 37 testes JUnit | `domain/FhirTransformer`, `domain/PatientAnonymizer` |
-| **db** | ✅ | schema (5 tabelas+índices), seed volume + seed-min | `db/*` |
-| **keycloak** | ✅ | realm + roles + 4 usuários + get-token | `keycloak/*` |
-| **k8s/base** | ✅ | 6 Deployments/Services, `requests.cpu` setado | `k8s/base/*` |
-| **k8s/observability** | 🟡 | só ServiceMonitor; **sem dashboard JSON**, **sem HPA** | `k8s/observability/servicemonitor.yaml` |
-| **Services gRPC** | 🟡 | ClusterIP normal — **sem headless + round_robin** (não balanceia) | `k8s/base/*.yaml`, gateway `application.yml` |
-| **loadtest** | ⬜ | vazio (só `.gitkeep`) | `loadtest/` |
-| **frontend** | ⬜ | vazio (só `.gitkeep`) — **obrigatório mínimo** (§9.1: login OIDC + 3 consultas), mas P2 e 1º a cortar | `frontend/` · client `hospital-frontend` no realm |
-| **tracing (OTel+Tempo)** | ⬜ ➕ | inexistente (bônus) | — |
-| **Makefile** | 🟡 | reais menos `load`/`demo` (stubs); `rebuild` no `.PHONY` sem corpo | `Makefile` |
+| Componente | Dono | Estado | Veredito | Ponteiro |
+|---|:--:|:--:|---|---|
+| **api-gateway** | 🅱️ | 🟡 | JWT real + cadeia gRPC, mas **só a rota `/fhir/Patient/{id}`**; sem rate-limit/logging/erro gRPC | `FhirPatientController`, `SecurityConfig` |
+| **authorization** | 🅱️ | ✅ | **Completo**: domínio puro + repos + gRPC + testes JUnit | `authorization/domain/*`, `adapters/*` |
+| **patient-data** | 🅲 | ✅ | **Completo** (P3a): prontuário individual + agregação de coorte + amostra de exames; testes JUnit | `PatientRepository`, `domain/Percentages` |
+| **data-transform** | 🅲 | ✅ | **Completo** (P3b): enforcement por `nivel` + 5 recursos FHIR + `MeasureReport`; 37 testes JUnit | `domain/FhirTransformer`, `domain/PatientAnonymizer` |
+| **db** | 🅳 | ✅ | schema (5 tabelas+índices), seed volume + seed-min | `db/*` |
+| **keycloak** | 🅴 | ✅ | realm + roles + 4 usuários + get-token | `keycloak/*` |
+| **k8s/base** | 🅰️ | ✅ | 6 Deployments/Services, `requests.cpu` setado | `k8s/base/*` |
+| **k8s/observability** | 🅴 | 🟡 | só ServiceMonitor; **sem dashboard JSON** | `k8s/observability/servicemonitor.yaml` |
+| **HPA** | 🅰️ | ⬜ | manifesto ausente (`requests.cpu` já pronto) | `k8s/base/hpa.yaml` (a criar) |
+| **Services gRPC** | 🅰️ | 🟡 | ClusterIP normal — **sem headless + round_robin** (não balanceia) | `k8s/base/*.yaml`, gateway `application.yml` |
+| **loadtest** | 🅳 | ⬜ | vazio (só `.gitkeep`) | `loadtest/` |
+| **frontend** | 🅴 | ⬜ | vazio (só `.gitkeep`) — **obrigatório mínimo** (§9.1: login OIDC + 3 consultas), mas P2 e 1º a cortar | `frontend/` · client `hospital-frontend` no realm |
+| **tracing (OTel+Tempo)** | 🅴 | ⬜ ➕ | inexistente (bônus) | — |
+| **Makefile** | 🅰️ | 🟡 | reais menos `load`/`demo` (stubs); `rebuild` no `.PHONY` sem corpo | `Makefile` |
 
 ---
 
@@ -205,16 +216,18 @@ D — e o **frontend (🅴) é o primeiro a cortar** (§ordem de corte).
 
 ## 5. As 3 descobertas do §7 (garantem os 80% — documentar com evidência)
 
-- [ ] **§7.1 — PostgreSQL como gargalo (stateful)** ⭐ _principal_ — throughput satura ao escalar app;
+- [ ] 🅳 **§7.1 — PostgreSQL como gargalo (stateful)** ⭐ _principal_ — throughput satura ao escalar app;
   evidência USE: CPU do Postgres ~100%, `hikaricp_connections_pending > 0`, timeouts, `db_tps` no platô.
-- [ ] **§7.2 — HPA × cold-start da JVM** — pod novo leva 20–40s p/ ficar Ready → latência piora antes de melhorar.
-- [ ] **§7.3 — gRPC sobre Service não balanceia** — HTTP/2 multiplexa 1 conexão → 1 pod recebe ~100%; antes/depois do `round_robin`.
+  _Insumo já colhido: o Seq Scan de 425 ms em `freqMedicamentos` (§7 abaixo)._
+- [ ] 🅰️ **§7.2 — HPA × cold-start da JVM** — pod novo leva 20–40s p/ ficar Ready → latência piora antes de melhorar.
+- [ ] 🅰️+🅳 **§7.3 — gRPC sobre Service não balanceia** — HTTP/2 multiplexa 1 conexão → 1 pod recebe ~100%;
+  🅰️ faz o fix, 🅳 mede **antes e depois** do `round_robin` (a medição do "antes" precisa acontecer **antes** do fix).
 
 ## 6. Métricas mínimas exigidas (§5 / §9.5) — status ⬜
 
-- [ ] Carga **≥4**: throughput · latência **média + P95/P99** · CPU/serviço · memória/serviço · taxa de erro
-- [ ] Observabilidade **≥5**, organizadas em **RED** (Rate/Errors/Duration por serviço) + **USE** (Utilization/Saturation/Errors por recurso) + Golden Signals
-- [ ] Percentis **P95/P99, não média** (histograma já habilitado no `application.yml`)
+- [ ] 🅳 Carga **≥4**: throughput · latência **média + P95/P99** · CPU/serviço · memória/serviço · taxa de erro
+- [ ] 🅴 Observabilidade **≥5**, organizadas em **RED** (Rate/Errors/Duration por serviço) + **USE** (Utilization/Saturation/Errors por recurso) + Golden Signals
+- [ ] 🅳 Percentis **P95/P99, não média** (histograma já habilitado no `application.yml`)
 
 ---
 
