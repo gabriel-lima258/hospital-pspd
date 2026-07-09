@@ -26,9 +26,12 @@ vídeo (§9.4) — o enunciado avalia "percepção de equilíbrio na distribuiç
 |---|---|---|:--:|
 | **Arthur** | (A) Plataforma / K8S / DevOps | cluster, manifests, **HPA**, **gRPC headless + round_robin**, `Makefile` (`demo`, `load`) | 🟡 |
 | **Mateus** | (B) Backend Core — Gateway + Auth | rate limiting, logging estruturado, erro gRPC→HTTP, probes, `authorization` | 🟡 |
-| **Gabriel** | (C) Backend Dados + **integração** | patient-data, data-transform, **P3c**, guarda dos portões, relatório §9 | ✅ |
+| **Gabriel** | (C) Backend Dados | patient-data, data-transform, **P3c**, guarda dos portões | ✅ |
 | **Carlos** | (D) Dados & Carga (Performance) | k6, `collect-metrics.sh`, `plot.py`, CSVs, gráficos, **as 3 descobertas §7**, `db/` | ⬜ |
-| **Guilherme** | (E) Auth Infra + Frontend + Observabilidade viz | frontend React, **dashboards Grafana RED/USE**, `keycloak/`, tracing OTel+Tempo ➕ | ⬜ |
+| **Guilherme** | (E) Frontend + Observabilidade viz + **entrega** | frontend React, **dashboards Grafana RED/USE**, `keycloak/`, tracing ➕, **relatório §9 + zip** | ⬜ |
+
+> **Relatório:** cada trilha **escreve a sua seção** (é o que cada um apresenta no vídeo);
+> o **Guilherme consolida** na estrutura §9.6, fecha as conclusões e entrega o zip no Moodle.
 
 ### Herança do trabalho já feito
 
@@ -119,7 +122,7 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
 - [x] **(P3b) Pesquisador vê AGG/ANON de verdade** — ANONYMIZED pseudonimiza (sha256 salgado, estável) e trunca datas ao ano; AGGREGATED devolve `MeasureReport` sem dado individual. Validado via grpcurl (falta só a **rota REST**, no P3c)
 - [ ] **Gabriel** 🟡 **(P3c) Rota REST de coorte no gateway** — resolver `projeto_id` → `codigo_condicao`; exige evoluir o `AuthzReply` (**mudança de contrato**, avisar **Mateus** no mesmo dia) · `FhirPatientController`
 - [ ] **Gabriel** As **3 jornadas** validadas ponta-a-ponta no cluster: médico ✅ e estagiário ✅ pela rota REST; pesquisador só por gRPC direto até o P3c
-- [ ] **Gabriel** Seção "Validação funcional" do relatório escrita com prints
+- [ ] **Gabriel** Seção "Validação funcional" do relatório escrita com prints → entrega ao **Guilherme**, que consolida
 - 📎 Evidências: `docs/evidencias/{patient-data-coorte.md, data-transform-niveis.md}`
 
 ### 🚦 Portão 4 = M3 — Observabilidade + carga 1 réplica, Fases (e)+(b) (D4) ⬜
@@ -146,13 +149,14 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
 - [ ] **Guilherme** ➕ `postgres-exporter` (métricas do banco no Prometheus)
 - [ ] **Carlos** Todos os cenários (1replica/3replicas/hpa) coletados sob condições idênticas (§4.9)
 - [ ] **Carlos** `loadtest/plot.py` gera todos os gráficos comparativos → `docs/evidencias/*.png`
-- [ ] **Gabriel** Conclusões por fase rascunhadas (consolida o que cada trilha mediu)
+- [ ] **Guilherme** Conclusões por fase rascunhadas (consolida o que cada trilha mediu)
 
 ### 🚦 Portão 7 = M6 — Entrega (D7) ⬜
-- [ ] **Gabriel** Relatório completo na estrutura §9.6 (todas as fases, resultados, conclusões)
+- [ ] **Guilherme** Relatório completo na estrutura §9.6 — **consolida** as seções que cada trilha escreveu
+- [ ] **todos** Cada dono entrega a seção da sua trilha ao Guilherme (Arthur: cluster/HPA · Mateus: regras de acesso · Gabriel: dados/FHIR · Carlos: carga/descobertas · Guilherme: arquitetura/observabilidade)
 - [ ] **todos** Vídeo (~4–6 min/aluno, todos aparecem, 5 trilhas apresentadas)
 - [ ] **Arthur** `make demo` reproduz do zero, limpo
-- [ ] **Gabriel** Zip no Moodle + código no GitHub com link no relatório
+- [ ] **Guilherme** Zip no Moodle + código no GitHub com link no relatório
 - [ ] **todos** Checklist §9 100% marcado + autoavaliação por membro (com nota)
 
 **Roteiro do vídeo** (§9.4 — 5 alunos × 4–6 min; cada um abre com _"sou responsável por X, vou mostrar Y funcionando"_):
@@ -213,7 +217,7 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
    - **DoD:** loga com `med.cardoso`/`est.almeida`/`pesq.souza`, envia `Authorization: Bearer` ao gateway, mostra as 3 respostas (inclusive um DENY→403). Serve principalmente ao **vídeo/demo (D7)**, não aos pontos técnicos.
    - **Depende de:** fechar o M2 (para as respostas por nível terem sentido) e, para o pesquisador, das rotas de coorte no gateway (ainda inexistentes).
 10. **Arthur** · **`make demo`** _(Portão 2/7)_ — reprodução ponta-a-ponta.
-11. **Gabriel** · **Relatório §9 + vídeo** _(Portão 7)_ — escrever incrementalmente, não deixar p/ o fim. Cada trilha entrega a sua seção; **Gabriel** consolida.
+11. **Guilherme** · **Relatório §9 + vídeo** _(Portão 7)_ — escrever incrementalmente, não deixar p/ o fim. Cada trilha entrega a sua seção; **o Guilherme consolida** e entrega.
 
 ---
 
@@ -259,7 +263,7 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
 | **80%** técnico+profundidade | 5 fases medidas com números reais | 🟡→⬜ | (a) parcial; (b)(c)(d)(e) pendentes — **prioridade máxima** |
 | | 3 descobertas §7 documentadas | ⬜ | dependem da carga |
 | | RED+USE+Golden Signals, P95/P99 | ⬜ | rigor estatístico = profundidade |
-| **20%** entregas | Relatório §9.6 estruturado | ⬜ | escrever incrementalmente |
+| **20%** entregas | Relatório §9.6 estruturado | ⬜ | **Guilherme** consolida; cada trilha escreve a sua seção, incrementalmente |
 | | Vídeo 4–6 min/aluno | ⬜ | todos aparecem; fechar com as 3 descobertas |
 | | README reproduzível (`make …`) | 🟡 | falta `make demo` + fases de carga |
 | | Frontend mínimo (login OIDC + 3 consultas, §9.1) | ⬜ | P2, baixo peso; serve ao vídeo/demo; 1º a cortar |
