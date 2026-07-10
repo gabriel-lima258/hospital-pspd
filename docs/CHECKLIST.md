@@ -114,7 +114,7 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
 - [x] 4 targets **UP** no Prometheus · `k8s/observability/servicemonitor.yaml`
 - [x] Métrica `http_server_requests_seconds_count{application="api-gateway"}` visível no Grafana
 - [ ] **Guilherme** 🟡 **PNG do Grafana** ainda **manual** (automação de browser não alcançou o port-forward) · ver `docs/evidencias/README.md`
-- [x] **Arthur** `make demo` implementado (deploy + seed enxuto + smoke das 3 jornadas; `DEMO_FRESH=1` recria o cluster) — **falta rodar `DEMO_FRESH=1` uma vez** e registrar a saída
+- [x] **Arthur** `make demo` implementado e **rodado 2026-07-10** (3 jornadas `OK`, saída em `docs/evidencias/escala-hpa-grpc-lb.md` §6) — **falta ainda `DEMO_FRESH=1` do zero** (Portão 7). Requisito descoberto: `jq` na WSL
 - 📎 Evidências: `docs/evidencias/{seed-volume-cluster.md, *http_server_requests*.json}`
 
 ### 🚦 Portão 3 = M2 — Validação funcional, Fase (a) (D3) ✅
@@ -149,8 +149,8 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
 - [x] **Arthur** **Fix gRPC LB implementado** — Service **headless** (`k8s/base/grpc-headless.yaml`) + `round_robin`. **Diagnóstico corrigido:** o `net.devh` 3.1.0 **já usa `round_robin` como default**; o bug era só o ClusterIP resolver para 1 IP virtual (round-robin sobre uma lista de 1 elemento) enquanto o HTTP/2 multiplexa tudo numa conexão. Toggle `make grpc-lb-on|off` preserva o "antes" do §7.3 → **Carlos destravado** (não há mais dependência de calendário)
 - [x] **Arthur** **HPA** v2 criado (min 1 / max 10 / CPU 60%, 4 serviços) · `k8s/hpa/hpa.yaml` · fora do `make deploy` para não contaminar os cenários de réplica fixa
 - [x] **Arthur** `replicas:` removido dos 4 Deployments (senão `kubectl apply` reseta a escala no meio da medição)
-- [ ] **Arthur** `kubectl get hpa` mostra `%/60%` (não `<unknown>`); escala automática evidenciada no tempo — **falta rodar e capturar**
-- [ ] **Arthur** Distribuição de pods entre os 3 workers (`make pods-wide`, screenshot) — **falta capturar**
+- [x] **Arthur** `kubectl get hpa` mostra `%/60%` (não `<unknown>`) — capturado 2026-07-10 em `docs/evidencias/escala-hpa-grpc-lb.md` §4 (PNG a anexar). _Escala automática **no tempo** (`get hpa -w` + CSV sob rampa) fica no Bloco 8 → depende do Carlos rodando k6._
+- [x] **Arthur** Distribuição de pods entre os 3 workers (`make pods-wide`) — capturado 2026-07-10, §3 do evidencias: 1 pod/worker nos 4 serviços (`maxSkew:1` ideal). PNG a anexar
 - [ ] **Carlos** `make load SCENARIO=3replicas` (3 réplicas) medido nos 5 níveis; comparação vs 1 réplica
 - [ ] **Carlos** **Limite de escalabilidade** identificado (satura no Postgres) + impacto no banco documentado (USE)
 

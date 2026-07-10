@@ -1,9 +1,10 @@
 # Escalabilidade, HPA e balanceamento gRPC (Trilha A — Portão 5)
 
-> ⚠️ **Estado: protocolo de captura, ainda SEM medição.** Os manifests e os alvos do `Makefile`
-> existem e os YAMLs validam, mas **nenhum comando abaixo foi executado no cluster**. Cada bloco
-> `RESULTADO` está vazio de propósito. Preencher no ato da captura (regra de ouro: evidência no
-> mesmo dia) — **não** copiar números de outra rodada.
+> ⚠️ **Estado (2026-07-10): blocos solo capturados; blocos com carga pendentes do Carlos (k6).**
+> Rodado no cluster kind `pspd` (1 control-plane + 3 workers). Capturados nesta data: §1 (DNS),
+> §3 (distribuição de pods), §4 `kubectl get hpa`, §6 (smoke). Continuam `(pendente)` os que exigem
+> a bateria k6: §2 (antes×depois sob carga), §4b (CSV da série temporal) e §5 (§7.2 sob rampa).
+> Regra de ouro: evidência no mesmo dia — **não** copiar números de outra rodada.
 >
 > **Dono:** Arthur (Trilha A). **Consumidor:** Carlos (§7.3) e o relatório §9.5 fases (c) e (d).
 
@@ -37,11 +38,30 @@ kubectl run dns --rm -it --restart=Never --image=busybox:1.36 -- \
   nslookup patient-data-headless.default.svc.cluster.local
 ```
 
-**RESULTADO** _(colar as duas saídas do `nslookup`)_:
+**RESULTADO** _(capturado 2026-07-10, cluster `pspd`, `scale N=3`)_:
 
 ```
-(pendente)
+# ClusterIP → 1 endereço (o IP virtual do Service)
+$ nslookup patient-data.default.svc.cluster.local
+Server:    10.96.0.10
+Address:   10.96.0.10:53
+Name:   patient-data.default.svc.cluster.local
+Address: 10.96.33.124
+
+# headless → 3 registros A, um por pod (subnets .1/.2/.3 = 3 workers distintos)
+$ nslookup patient-data-headless.default.svc.cluster.local
+Server:    10.96.0.10
+Address:   10.96.0.10:53
+Name:   patient-data-headless.default.svc.cluster.local
+Address: 10.244.2.8
+Name:   patient-data-headless.default.svc.cluster.local
+Address: 10.244.3.8
+Name:   patient-data-headless.default.svc.cluster.local
+Address: 10.244.1.6
 ```
+
+> Confirma a tese: ClusterIP devolve **1** endereço, headless devolve **3**. Os 3 IPs headless caem
+> em subnets de nós diferentes — a distribuição por worker é a mesma vista em §3.
 
 > **Leitura para o relatório.** O `net.devh:grpc-client-spring-boot-starter:3.1.0.RELEASE` já usa
 > `round_robin` como `defaultLoadBalancingPolicy` — verificável em `GrpcChannelProperties`. Ele faz
@@ -108,11 +128,36 @@ make pods-wide          # kubectl get pods -o wide
 kubectl top nodes
 ```
 
-**RESULTADO** _(colar a saída; conferir se os pods de um mesmo Deployment caem em workers diferentes)_:
+**RESULTADO** _(capturado 2026-07-10, `scale N=3`)_ — cada Deployment de 3 réplicas ficou com
+**1 pod por worker** (`maxSkew: 1` satisfeito, zero empilhamento):
 
 ```
-(pendente)
+$ kubectl get pods -o wide
+NAME                              READY   STATUS    IP            NODE
+api-gateway-7fb9775498-c4f7q      1/1     Running   10.244.3.11   pspd-worker2
+api-gateway-7fb9775498-ntgsv      1/1     Running   10.244.1.13   pspd-worker
+api-gateway-7fb9775498-vqwf7      1/1     Running   10.244.2.10   pspd-worker3
+authorization-5dcbbd67d7-69rs9    1/1     Running   10.244.2.9    pspd-worker3
+authorization-5dcbbd67d7-8kqn8    1/1     Running   10.244.3.7    pspd-worker2
+authorization-5dcbbd67d7-nwlp9    1/1     Running   10.244.1.5    pspd-worker
+data-transform-67bb67485f-6lx22   1/1     Running   10.244.1.8    pspd-worker
+data-transform-67bb67485f-6twmf   1/1     Running   10.244.2.4    pspd-worker3
+data-transform-67bb67485f-pzjpg   1/1     Running   10.244.3.9    pspd-worker2
+patient-data-6655bd44d5-5gjjc     1/1     Running   10.244.2.8    pspd-worker3
+patient-data-6655bd44d5-lmxxf     1/1     Running   10.244.1.6    pspd-worker
+patient-data-6655bd44d5-q5mz9     1/1     Running   10.244.3.8    pspd-worker2
+
+$ kubectl top nodes
+NAME                 CPU(cores)   CPU(%)   MEMORY(bytes)   MEMORY(%)
+pspd-control-plane   100m         0%       901Mi           11%
+pspd-worker          60m          0%       1111Mi          14%
+pspd-worker2         65m          0%       1535Mi          20%
+pspd-worker3         97m          0%       1774Mi          23%
 ```
+
+> Distribuição ideal: os 4 serviços têm exatamente 1 réplica em cada um dos 3 workers. Uso de nós
+> baixo (idle, sem carga) — a assinatura sob carga entra em §4b/§5 com a bateria do Carlos.
+> 📸 Screenshot desta saída: `docs/evidencias/pods-wide-2026-07-10.png` _(a capturar/anexar)_.
 
 ---
 
@@ -128,11 +173,28 @@ kubectl get hpa -w              # sob carga: TARGETS sobe, REPLICAS sobe
 kubectl get pods -w             # tempo até Ready de cada pod novo
 ```
 
-**RESULTADO — `kubectl get hpa`** _(prova de que o `requests.cpu` está sendo lido)_:
+**RESULTADO — `kubectl get hpa`** _(capturado 2026-07-10, ~64 s após `make hpa-on`)_ — `TARGETS`
+mostra `%/60%` real, **não** `<unknown>`, provando que o `requests.cpu: 250m` está sendo lido:
 
 ```
-(pendente)
+$ kubectl get hpa     # imediatamente após criar (métricas ainda populando)
+NAME             REFERENCE                   TARGETS              MINPODS   MAXPODS   REPLICAS
+api-gateway      Deployment/api-gateway      cpu: <unknown>/60%   1         10        0
+authorization    Deployment/authorization    cpu: <unknown>/60%   1         10        0
+data-transform   Deployment/data-transform   cpu: <unknown>/60%   1         10        0
+patient-data     Deployment/patient-data     cpu: <unknown>/60%   1         10        0
+
+$ sleep 60 && kubectl get hpa     # metrics-server populou
+NAME             REFERENCE                   TARGETS       MINPODS   MAXPODS   REPLICAS   AGE
+api-gateway      Deployment/api-gateway      cpu: 2%/60%   1         10        3          64s
+authorization    Deployment/authorization    cpu: 1%/60%   1         10        3          64s
+data-transform   Deployment/data-transform   cpu: 1%/60%   1         10        3          64s
+patient-data     Deployment/patient-data     cpu: 1%/60%   1         10        3          64s
 ```
+
+> O `<unknown>` inicial é o `metrics-server` ainda populando (~60 s), não erro de config. CPU baixa
+> (idle, sem carga). `REPLICAS 3` herdado do `scale N=3` anterior — o HPA não faz scale-down imediato.
+> 📸 Screenshot desta saída: `docs/evidencias/hpa-targets-2026-07-10.png` _(a capturar/anexar)_.
 
 > `<unknown>/60%` significa `metrics-server` ainda populando (aguardar ~60 s) ou `resources.requests.cpu`
 > ausente. Os 4 Deployments já têm `requests: { cpu: "250m" }`.
@@ -228,8 +290,22 @@ kubectl get events --sort-by=.lastTimestamp | grep -E 'Scheduled|Started|Ready'
 make demo DEMO_FRESH=1      # cluster do zero → deploy → seed → smoke das 3 jornadas
 ```
 
-**RESULTADO** _(as 3 linhas `OK` do smoke)_:
+**RESULTADO** _(capturado 2026-07-10, `make demo` com seed SCALE=5000)_:
 
 ```
-(pendente)
+=== RESUMO ===
+  patients                 : 5,000
+  encounters               : 20,086
+  clinical_events          : 139,803
+  user_patient_assignments : 5,200
+  projects                 : 50
+
+>> smoke das 3 jornadas (port-forward efêmero em 8081/9001)
+  OK  medico/FULL        -> Patient no Bundle FHIR
+  OK  pesquisador/AGG    -> MeasureReport (sem dado individual)
+  OK  medico sem vínculo -> DENY (403)
 ```
+
+> ⚠️ Nesta rodada foi `make demo` (cluster já de pé), **não** `make demo DEMO_FRESH=1` do zero — o
+> Portão 7 (replicabilidade do zero para o professor) continua a rodar ao menos uma vez.
+> Pré-requisito descoberto: o smoke usa `jq`; instalar na WSL (`apt-get install -y jq`) antes.

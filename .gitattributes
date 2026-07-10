@@ -1,0 +1,4 @@
+# Força LF em scripts executados no WSL/cluster (core.autocrlf=true quebra o shebang).
+*.sh    text eol=lf
+gradlew text eol=lf
+*.bat   text eol=crlf

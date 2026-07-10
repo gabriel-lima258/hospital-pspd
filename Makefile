@@ -90,9 +90,10 @@ grafana:
 # ── Deploy no cluster kind (Trilha A, §4.8) ──────────────────────────────────
 SERVICES = api-gateway authorization patient-data data-transform
 
-# Build dos 4 jars + imagens hospital/<svc>:dev, carregadas no kind (sem registry).
+# Imagens hospital/<svc>:dev, carregadas no kind (sem registry).
+# Cada Dockerfile é multi-stage: compila o bootJar num temurin:21-jdk, então não
+# depende de Java no host. (Testes de unidade: rode `./gradlew build` onde houver JDK.)
 images:
-	./gradlew build
 	@for s in $(SERVICES); do \
 	  echo ">> docker build hospital/$$s:dev"; \
 	  docker build -t hospital/$$s:dev -f services/$$s/Dockerfile . || exit 1; \
