@@ -83,6 +83,14 @@ próprio `try/catch`.)
 `UNAUTHENTICATED`→**401**, `UNAVAILABLE`→**503**, `DEADLINE_EXCEEDED`→**504**, resto→**502**. Em
 particular, **paciente inexistente** → Patient Data sinaliza `NOT_FOUND` → **404** (antes: 500).
 
+**Robustez de chamada gRPC** — o Gateway aplica um **deadline default de 2 s** a toda chamada gRPC
+(`DeadlineClientInterceptor`, global; `gateway.grpc.deadline-ms`, env `GATEWAY_GRPC_DEADLINE_MS`).
+Sem isso, um downstream travado prenderia a thread indefinidamente → sob carga, exaustão do pool. O
+estouro vira `DEADLINE_EXCEEDED` → **504**. **Erros internos não vazam**: os 3 serviços gRPC capturam
+o inesperado, **logam com stack** (`log.error`, JSON com `trace_id`) e devolvem `INTERNAL` com
+descrição genérica ("erro interno") → **502** ao cliente, nunca a exceção/stack crua. Os branches
+específicos (`NOT_FOUND`, `INVALID_ARGUMENT`) são preservados.
+
 **Rate limiting** (`RateLimitFilter`) — token bucket por usuário (chave = subject do JWT), aplicado
 após a autenticação a todas as rotas exceto `/actuator/**`. Estourou → **429** com header
 `Retry-After` (segundos) e corpo `{"error":"rate_limited","retry_after_ms":N}`. Parâmetros em

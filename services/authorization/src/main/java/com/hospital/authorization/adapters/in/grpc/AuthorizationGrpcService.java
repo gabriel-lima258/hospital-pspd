@@ -2,6 +2,9 @@ package com.hospital.authorization.adapters.in.grpc;
 
 import java.time.LocalDate;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.hospital.authorization.adapters.out.jpa.AssignmentRepository;
 import com.hospital.authorization.adapters.out.jpa.ProjectRepository;
 import com.hospital.authorization.domain.AuthorizationPolicy;
@@ -12,6 +15,7 @@ import com.hospital.authorization.domain.ProjectInfo;
 import hospital.AuthorizationGrpc;
 import hospital.AuthzReply;
 import hospital.AuthzRequest;
+import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import net.devh.boot.grpc.server.service.GrpcService;
 
@@ -28,6 +32,8 @@ import net.devh.boot.grpc.server.service.GrpcService;
 @GrpcService
 public class AuthorizationGrpcService extends AuthorizationGrpc.AuthorizationImplBase {
 
+    private static final Logger log = LoggerFactory.getLogger(AuthorizationGrpcService.class);
+
     private final AssignmentRepository assignments;
     private final ProjectRepository projects;
     private final AuthorizationPolicy policy = new AuthorizationPolicy();
@@ -39,29 +45,37 @@ public class AuthorizationGrpcService extends AuthorizationGrpc.AuthorizationImp
 
     @Override
     public void check(AuthzRequest request, StreamObserver<AuthzReply> responseObserver) {
-        String role = request.getRole();
-        String username = request.getUsername();
-        String patientId = request.getPatientId();
+        try {
+            String role = request.getRole();
+            String username = request.getUsername();
+            String patientId = request.getPatientId();
 
-        // Apura só o fato relevante ao perfil (evita hits inúteis no banco).
-        boolean medicoAtivo = "MEDICO".equals(role)
-                && assignments.countVinculoMedicoAtivo(username, patientId) > 0;
-        boolean estagiarioAtivo = "ESTAGIARIO".equals(role)
-                && assignments.existeEstagiarioSupervisionadoAtivo(username, patientId);
-        ProjectInfo projeto = "PESQUISADOR".equals(role)
-                ? projects.findDoDono(username, request.getProjetoId()).orElse(null)
-                : null;
+            // Apura só o fato relevante ao perfil (evita hits inúteis no banco).
+            boolean medicoAtivo = "MEDICO".equals(role)
+                    && assignments.countVinculoMedicoAtivo(username, patientId) > 0;
+            boolean estagiarioAtivo = "ESTAGIARIO".equals(role)
+                    && assignments.existeEstagiarioSupervisionadoAtivo(username, patientId);
+            ProjectInfo projeto = "PESQUISADOR".equals(role)
+                    ? projects.findDoDono(username, request.getProjetoId()).orElse(null)
+                    : null;
 
-        Decision d = policy.decide(new AuthzInput(
-                role, request.getTipoConsulta(), medicoAtivo, estagiarioAtivo, projeto, LocalDate.now()));
+            Decision d = policy.decide(new AuthzInput(
+                    role, request.getTipoConsulta(), medicoAtivo, estagiarioAtivo, projeto, LocalDate.now()));
 
-        AuthzReply reply = AuthzReply.newBuilder()
-                .setAllow(d.allow())
-                .setNivel(d.allow() ? d.nivel().name() : "")
-                .setCoorteCodigo(coorteCodigoDaReply(d.allow(), role, projeto))
-                .build();
-        responseObserver.onNext(reply);
-        responseObserver.onCompleted();
+            AuthzReply reply = AuthzReply.newBuilder()
+                    .setAllow(d.allow())
+                    .setNivel(d.allow() ? d.nivel().name() : "")
+                    .setCoorteCodigo(coorteCodigoDaReply(d.allow(), role, projeto))
+                    .build();
+            responseObserver.onNext(reply);
+            responseObserver.onCompleted();
+        } catch (Exception e) {
+            // Falha inesperada (ex.: erro de DB ao apurar vínculo/projeto): loga com stack e devolve
+            // INTERNAL genérico — nunca a exceção crua, que vazaria detalhe interno ao cliente.
+            log.error("falha inesperada em check (role={})", request.getRole(), e);
+            responseObserver.onError(Status.INTERNAL
+                    .withDescription("erro interno").asRuntimeException());
+        }
     }
 
     /**

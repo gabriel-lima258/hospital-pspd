@@ -47,10 +47,15 @@ management:
       percentiles-histogram:
         http.server.requests: true
 
-# Rate limiting por usuário (exigência do enunciado). Token bucket em memória por instância.
-# `enabled` é toggle de runtime: a bateria k6 (pool de 3 usuários) DESLIGA via
-# GATEWAY_RATELIMIT_ENABLED=false para não medir o limitador em vez da aplicação (ver loadtest/).
+# Config do Gateway (namespace próprio, fora do Spring).
 gateway:
+  # Deadline default das chamadas gRPC (protege o thread pool sob carga; estouro → 504).
+  # Override por env GATEWAY_GRPC_DEADLINE_MS. Ver grpc/DeadlineClientInterceptor.
+  grpc:
+    deadline-ms: ${GATEWAY_GRPC_DEADLINE_MS:2000}
+  # Rate limiting por usuário (exigência do enunciado). Token bucket em memória por instância.
+  # `enabled` é toggle de runtime: a bateria k6 (pool de 3 usuários) DESLIGA via
+  # GATEWAY_RATELIMIT_ENABLED=false para não medir o limitador em vez da aplicação (ver loadtest/).
   ratelimit:
     enabled: ${GATEWAY_RATELIMIT_ENABLED:true}
     capacity: ${GATEWAY_RATELIMIT_CAPACITY:50}

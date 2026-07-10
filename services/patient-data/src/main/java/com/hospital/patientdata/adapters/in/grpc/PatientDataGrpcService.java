@@ -5,6 +5,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.EmptyResultDataAccessException;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -28,6 +30,8 @@ import net.devh.boot.grpc.server.service.GrpcService;
  */
 @GrpcService
 public class PatientDataGrpcService extends PatientDataGrpc.PatientDataImplBase {
+
+    private static final Logger log = LoggerFactory.getLogger(PatientDataGrpcService.class);
 
     /** Gêneros do seed; ordem fixa para que a chave apareça mesmo com contagem zero. */
     private static final List<String> ORDEM_SEXO = List.of("male", "female", "other");
@@ -65,7 +69,11 @@ public class PatientDataGrpcService extends PatientDataGrpc.PatientDataImplBase 
             responseObserver.onError(Status.NOT_FOUND
                     .withDescription("recurso não encontrado").asRuntimeException());
         } catch (Exception e) {
-            responseObserver.onError(e);
+            // Falha inesperada (ex.: erro de SQL/conexão): loga com stack e devolve INTERNAL genérico
+            // — nunca a exceção crua, que vazaria detalhe interno ao cliente.
+            log.error("falha inesperada em fetch (tipo={})", request.getTipoConsulta(), e);
+            responseObserver.onError(Status.INTERNAL
+                    .withDescription("erro interno").asRuntimeException());
         }
     }
 

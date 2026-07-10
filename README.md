@@ -301,6 +301,8 @@ Gradle:
   no `Makefile`. Falta **medir**.
 - ✅ **Gateway maduro** — rate limiting por usuário (429), logging estruturado JSON (auditoria),
   erro gRPC→HTTP global (404/400/…). Harness k6 (`make load`/`make plot`) pronto.
+- ✅ **Resiliência** — deadline gRPC default 2s (protege o thread pool sob carga → 504); erros
+  internos não vazam (`INTERNAL` genérico + `log.error` com `trace_id`); logs JSON nos 4 serviços.
 - ✅ **Logs agregados (bônus)** — Loki + Promtail (`make loki`); LogQL no Grafana sobre o JSON.
 - ✅ **Tracing distribuído (bônus)** — OTel agent + Tempo (`make tracing`); trace `REST→gRPC→SQL`
   com salto trace→log por `trace_id`. Fecha o triângulo métricas+logs+traces no mesmo Grafana.

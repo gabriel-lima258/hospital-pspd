@@ -83,6 +83,8 @@ docs/             # roteiro, prompts.md, evidencias/
 - ❌ gRPC sobre Service **ClusterIP** → não balanceia entre réplicas. A causa é o DNS devolver 1 IP virtual (o `round_robin` já é default no `net.devh` 3.1.0 e não tem sobre o que rodar); o HTTP/2 multiplexa tudo numa conexão só. Fix: Service **headless** (`clusterIP: None`) — `k8s/base/grpc-headless.yaml`.
 - ❌ Keycloak no caminho do teste de carga → gere **JWTs antes** (pool `tokens.json`, TTL longo).
 - ❌ Rodar o k6 na mesma máquina saturada pelo cluster → o cliente vira o gargalo.
+- ❌ Chamada gRPC **sem deadline** → downstream travado prende a thread; sob carga = exaustão do pool. Há deadline global de 2s (`DeadlineClientInterceptor`, `gateway.grpc.deadline-ms`) → estouro vira 504.
+- ❌ `responseObserver.onError(e)` com a exceção **crua** → vaza stack/mensagem interna e vira UNKNOWN. Padrão: `log.error(..., e)` + `Status.INTERNAL.withDescription("erro interno")` (502 genérico). Erros de contrato usam código específico (NOT_FOUND/INVALID_ARGUMENT).
 
 ## Fases e portões (Definition of Done)
 

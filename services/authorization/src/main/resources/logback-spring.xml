@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Logging estruturado em JSON no stdout (12-factor): coletado pelo Promtail → Loki. O LogstashEncoder
+  serializa o MDC como campos de topo — quando o tracing está ligado, o OTel agent injeta `trace_id`,
+  então um `log.error` deste serviço fica correlacionável com o trace no Grafana (Tempo↔Loki).
+-->
+<configuration>
+    <appender name="json" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <includeContext>false</includeContext>
+            <fieldNames>
+                <timestamp>ts</timestamp>
+                <message>msg</message>
+                <logger>logger</logger>
+                <thread>thread</thread>
+                <levelValue>[ignore]</levelValue>
+            </fieldNames>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="json"/>
+    </root>
+</configuration>
