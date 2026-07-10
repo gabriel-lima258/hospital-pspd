@@ -97,6 +97,11 @@ kubectl top pods -l app=patient-data
 
 Exigido pelo enunciado §3(c): *"a utilização dos nós do cluster, a distribuição dos pods do K8S"*.
 
+Os 4 Deployments declaram `topologySpreadConstraints` (`maxSkew: 1`, `topologyKey:
+kubernetes.io/hostname`, `whenUnsatisfiable: ScheduleAnyway`). Sem isso o default do scheduler é
+`maxSkew: 3` e 3 réplicas poderiam cair 2/1/0. É *soft* de propósito: com o HPA indo a 10 réplicas,
+um `DoNotSchedule` deixaria pods em `Pending` ao lotar o nó, e `Pending` sob carga contamina a fase (d).
+
 ```bash
 make scale N=3
 make pods-wide          # kubectl get pods -o wide
@@ -132,11 +137,41 @@ kubectl get pods -w             # tempo até Ready de cada pod novo
 > `<unknown>/60%` significa `metrics-server` ainda populando (aguardar ~60 s) ou `resources.requests.cpu`
 > ausente. Os 4 Deployments já têm `requests: { cpu: "250m" }`.
 
-**RESULTADO — `get hpa -w` durante a rampa de 1000 VUs** — é o **gráfico-assinatura da fase (d)**:
+**RESULTADO — `get hpa -w` durante a rampa de 1000 VUs**:
 
 ```
 (pendente)
 ```
+
+### 4b. Série temporal (pods × tempo) — o gráfico-assinatura da fase (d)
+
+`kubectl get hpa -w` gera texto, não dado. Para o gráfico 6 do roteiro (§4.9 — *nº de pods × tempo
+sobreposto à carga*) é preciso amostrar. Rodar **em background, antes** de o Carlos disparar a rampa:
+
+```bash
+make watch-hpa SCENARIO=hpa &
+#   ... rampa k6 até 1000 VUs ...
+kill %1
+```
+
+Gera `docs/evidencias/hpa-timeline.csv` com
+`ts_utc,elapsed_s,scenario,deployment,replicas,ready,cpu_pct,desired`. Rodadas de cenários
+diferentes acumulam no mesmo arquivo, distinguidas pela coluna `scenario` — o `plot.py` do Carlos
+filtra por ela.
+
+Vale rodar **também** nos cenários de réplica fixa: o CSV então prova que a contagem **não** variou
+durante a bateria (`replicas` constante, `cpu_pct` vazio), o que valida "mesmas condições de teste"
+exigido pelo enunciado.
+
+**RESULTADO — `hpa-timeline.csv`** _(colar as primeiras e as últimas linhas; o arquivo inteiro vai
+versionado)_:
+
+```
+(pendente)
+```
+
+> Repare na coluna `ready` × `replicas`: a distância entre as duas é o **cold-start da JVM** (§7.2).
+> Um pod contado em `replicas` mas ausente de `ready` está subindo e não atende ninguém.
 
 ---
 

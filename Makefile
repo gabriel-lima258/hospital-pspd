@@ -1,6 +1,6 @@
 # Makefile — Hospital Universitário (PSPD/UnB). Tudo que repete vira alvo (regra de ouro 4).
 .PHONY: up rebuild down logs cluster cluster-down grafana check-cluster-tools images deploy redeploy \
-        seed seed-local grpc-lb-on grpc-lb-off hpa-on hpa-off scale pods-wide load demo help
+        seed seed-local grpc-lb-on grpc-lb-off hpa-on hpa-off scale pods-wide watch-hpa load demo help
 
 # Nome do cluster kind (usado por cluster / cluster-down / deploy futuro).
 KIND_CLUSTER ?= pspd
@@ -22,6 +22,7 @@ help:
 	@echo "  Escala e balanceamento (Trilha A — fases c/d):"
 	@echo "  make scale N=3   - fixa as réplicas dos 4 serviços"
 	@echo "  make pods-wide   - kubectl get pods -o wide (distribuição entre os workers)"
+	@echo "  make watch-hpa SCENARIO=hpa - amostra réplicas/CPU num CSV (rode em background na rampa)"
 	@echo "  make grpc-lb-on  - gRPC balanceado: Service headless + round_robin (default)"
 	@echo "  make grpc-lb-off - gRPC pinado em 1 pod: ClusterIP + pick_first (o 'antes' do §7.3)"
 	@echo "  make hpa-on      - aplica o HPA (min 1 / max 10 / CPU 60%)"
@@ -166,6 +167,14 @@ scale: check-cluster-tools
 
 pods-wide:
 	kubectl get pods -o wide
+
+# Série temporal de réplicas/CPU dos 4 serviços → CSV. Rode em background ANTES da rampa do k6:
+#   make watch-hpa SCENARIO=hpa &   ...rampa...   kill %1
+# É o dado do gráfico "nº de pods × tempo" (§4.9 #6), a assinatura da fase (d).
+SCENARIO ?= unnamed
+INTERVAL ?= 5
+watch-hpa:
+	INTERVAL=$(INTERVAL) SCENARIO=$(SCENARIO) bash scripts/watch-hpa.sh
 
 # O default do application.yml já é headless+round_robin: `grpc-lb-on` só remove o override.
 # `kubectl set env` é idempotente, dispara o rollout sozinho e sobrevive a `kubectl apply`

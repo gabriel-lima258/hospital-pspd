@@ -230,6 +230,7 @@ Detalhes dos claims em `[docs/contratos.md](docs/contratos.md)`. Para recriar o 
 | `make deploy`                               | Build das imagens + `kind load` + aplica `k8s/base` e `k8s/observability` (**não** o HPA)        | ✅        |
 | `make scale N=3`                            | Fixa as réplicas dos 4 serviços e espera todas ficarem Ready                                    | ✅        |
 | `make pods-wide`                            | `kubectl get pods -o wide` — distribuição dos pods entre os workers                             | ✅        |
+| `make watch-hpa SCENARIO=hpa`               | Amostra réplicas/CPU dos 4 serviços num CSV. Rode **em background** durante a rampa do k6        | ✅        |
 | `make grpc-lb-on`                           | gRPC balanceado: Service headless + `round_robin` (é o default)                                 | ✅        |
 | `make grpc-lb-off`                          | gRPC pinado em 1 pod: ClusterIP + `pick_first` — o "antes" do §7.3                              | ✅        |
 | `make hpa-on` / `make hpa-off`              | Aplica/remove o HPA (`k8s/hpa/`, min 1 / max 10 / CPU 60%)                                      | ✅        |

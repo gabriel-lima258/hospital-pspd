@@ -53,6 +53,7 @@ docs/             # roteiro, prompts.md, evidencias/
 - `make seed` — popula o banco no volume-alvo (`seed=42`, reprodutível).
 - `make deploy` — build das imagens + `kind load` + aplica `k8s/base` e `k8s/observability` (**não** o HPA).
 - `make scale N=3` · `make pods-wide` — fixa réplicas · distribuição dos pods entre workers.
+- `make watch-hpa SCENARIO=hpa` — série temporal de réplicas/CPU → CSV (rodar em background na rampa).
 - `make grpc-lb-on|off` — headless+`round_robin` (default) × ClusterIP+`pick_first` (o "antes" do §7.3).
 - `make hpa-on|off` — aplica/remove `k8s/hpa/` (min 1 / max 10 / CPU 60%). `hpa-off` não reseta réplicas.
 - `make load SCENARIO=1replica|3replicas|hpa` — bateria k6 (10/50/100/500/1000 VUs). **TODO (Trilha D).**

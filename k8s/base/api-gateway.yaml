@@ -13,6 +13,16 @@ spec:
     metadata:
       labels: { app: api-gateway }
     spec:
+      # Espalha as réplicas pelos 3 workers — o enunciado §3(c) pede "a distribuição dos pods do
+      # K8S". O default do scheduler é maxSkew:3, que permitiria 3 réplicas caírem 2/1/0.
+      # `ScheduleAnyway` (soft) e não `DoNotSchedule`: com o HPA indo a 10 réplicas, um constraint
+      # duro deixaria pods em Pending ao lotar o nó — e Pending sob carga contamina a fase (d).
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels: { app: api-gateway }
       containers:
         - name: api-gateway
           image: hospital/api-gateway:dev

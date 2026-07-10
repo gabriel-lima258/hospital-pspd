@@ -12,6 +12,13 @@ spec:
     metadata:
       labels: { app: authorization }
     spec:
+      # Espalha as réplicas pelos 3 workers (§3(c) do enunciado). Ver api-gateway.yaml.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels: { app: authorization }
       containers:
         - name: authorization
           image: hospital/authorization:dev

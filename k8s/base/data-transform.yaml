@@ -12,6 +12,13 @@ spec:
     metadata:
       labels: { app: data-transform }
     spec:
+      # Espalha as réplicas pelos 3 workers (§3(c) do enunciado). Ver api-gateway.yaml.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels: { app: data-transform }
       containers:
         - name: data-transform
           image: hospital/data-transform:dev
