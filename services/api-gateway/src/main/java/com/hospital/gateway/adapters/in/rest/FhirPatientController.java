@@ -21,9 +21,9 @@ import hospital.TransformRequest;
 
 /**
  * Adapter de entrada REST do Gateway — prontuário individual (médico/estagiário). Orquestra a pilha
- * via gRPC: Authorization.Check → (ALLOW) PatientData.Fetch → DataTransform.ToFhir. Só o caminho
- * feliz: erro gRPC ainda vira 500 genérico (o mapeamento gRPC→HTTP global é item de backlog).
- * A coorte do pesquisador tem rota própria em {@link FhirCohortController}.
+ * via gRPC: Authorization.Check → (ALLOW) PatientData.Fetch → DataTransform.ToFhir. Erros gRPC que
+ * escapam daqui são traduzidos pelo {@link GrpcHttpExceptionHandler} (ex.: paciente inexistente →
+ * NOT_FOUND → 404). A coorte do pesquisador tem rota própria em {@link FhirCohortController}.
  */
 @RestController
 public class FhirPatientController {

@@ -138,7 +138,7 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
 - [ ] **Guilherme** Dashboard Grafana **RED + USE**, **≥5 métricas** ao vivo (JSON versionado + screenshot)
 - [ ] **Mateus** **Rate limiting** no Gateway (exigido pelo enunciado; hoje inexistente) · `api-gateway`
 - [ ] **Mateus** **Logging estruturado** (JSON) com `username`/`role`/`nivel`/`patient_id` — alimenta a auditoria e o tracing ➕
-- [ ] **Mateus** **Erro gRPC→HTTP**: hoje qualquer `onError` vira 500. `INVALID_ARGUMENT`→400, `NOT_FOUND`→404 (paciente inexistente hoje estoura 500)
+- [x] **Erro gRPC→HTTP**: `GrpcHttpExceptionHandler` (@RestControllerAdvice) mapeia por código — `NOT_FOUND`→404, `INVALID_ARGUMENT`→400, `PERMISSION_DENIED`→403, `UNAVAILABLE`→503, resto→502. Patient Data sinaliza `NOT_FOUND` p/ paciente inexistente (era 500). 7 testes JUnit ✅. _Arthur adiantou (Trilha B)._ **Falta validar E2E** (`curl` paciente inexistente → 404)
 - [ ] **Mateus** Probes _dependency-aware_ (readiness checa o DB)
 - [x] Pool de **JWTs pré-gerados** — `loadtest/gen-tokens.sh` gera `tokens.json` (mix 60/20/20, `seed=42`, TTL 30 min). _Arthur adiantou o harness (Trilha D)._
 - [x] `loadtest/k6/scenario.js` (mix dos 3 perfis, rotas 200 coerentes com o seed) + warm-up e reset de estado embutidos em `run-load-tests.sh`. _Arthur adiantou._

@@ -17,6 +17,14 @@ dependencies {
 
     // gRPC CLIENT (net.devh) — injeta stubs p/ Authorization/PatientData/DataTransform.
     implementation 'net.devh:grpc-client-spring-boot-starter:3.1.0.RELEASE'
+
+    // Testes de unidade (JUnit 5 puro — sem Spring). Versões pelo Spring BOM.
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+test {
+    useJUnitPlatform()
 }
 
 bootJar {

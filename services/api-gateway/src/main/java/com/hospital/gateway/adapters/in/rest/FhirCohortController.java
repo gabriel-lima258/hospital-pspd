@@ -36,7 +36,8 @@ import io.grpc.StatusRuntimeException;
  * pesquisador autorizaria em PRJ01 (Diabetes) e leria a coorte de qualquer outro projeto.
  *
  * <p>O mapeamento gRPC→HTTP aqui é local a esta rota, de propósito: o {@code @ControllerAdvice}
- * global é item de backlog e mudá-lo agora alteraria o comportamento da rota do prontuário (M1).
+ * global ({@link GrpcHttpExceptionHandler}) só cobre rotas SEM catch local: como aqui capturamos
+ * antes, esta rota não passa por ele e preserva o comportamento validado no M2 (400/403/404/502).
  */
 @RestController
 public class FhirCohortController {

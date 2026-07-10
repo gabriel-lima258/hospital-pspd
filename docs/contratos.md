@@ -74,7 +74,14 @@ O Authorization, que já lê `projects` para checar dono + status + vigência, d
 > leria a coorte de qualquer outro projeto — bypass da autorização. A rota não expõe esse parâmetro.
 
 Erros da rota de coorte: DENY → **403**; `tipo` inválido/ausente → **400**; coorte vazia → **404**;
-falha gRPC → **502**. Ver `docs/evidencias/pesquisador-coorte.md`.
+falha gRPC → **502**. Ver `docs/evidencias/pesquisador-coorte.md`. (Esta rota mapeia localmente, no
+próprio `try/catch`.)
+
+**Mapa gRPC→HTTP global** (`GrpcHttpExceptionHandler`, `@RestControllerAdvice`) — cobre as rotas
+**sem** `catch` local, hoje a de prontuário `GET /fhir/Patient/{id}`. Traduz o código do
+`StatusRuntimeException`: `NOT_FOUND`→**404**, `INVALID_ARGUMENT`→**400**, `PERMISSION_DENIED`→**403**,
+`UNAUTHENTICATED`→**401**, `UNAVAILABLE`→**503**, `DEADLINE_EXCEEDED`→**504**, resto→**502**. Em
+particular, **paciente inexistente** → Patient Data sinaliza `NOT_FOUND` → **404** (antes: 500).
 
 **Enforcement do nível** (Data Transform, desde o P3b) — o nível **decide a forma da saída**, não anota o dado:
 
