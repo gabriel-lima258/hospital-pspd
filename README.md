@@ -84,7 +84,7 @@ db/               # schema.sql · seed.py · seed-min.sql
 services/         # api-gateway · authorization · patient-data · data-transform
 frontend/         # React/Next (futuro)
 k8s/              # base/ (Deployments, Services, headless) · hpa/ · observability/ · jobs/
-loadtest/         # k6/, run-load-tests.sh, plot.py (futuro)
+loadtest/         # k6/scenario.js, gen-tokens.sh, run-load-tests.sh, collect-metrics.sh, plot.py
 keycloak/         # realm-export.json + get-token.sh
 docs/             # roteiro, contratos, CHECKLIST, evidências
 ```
@@ -235,7 +235,8 @@ Detalhes dos claims em `[docs/contratos.md](docs/contratos.md)`. Para recriar o 
 | `make grpc-lb-off`                          | gRPC pinado em 1 pod: ClusterIP + `pick_first` — o "antes" do §7.3                              | ✅        |
 | `make hpa-on` / `make hpa-off`              | Aplica/remove o HPA (`k8s/hpa/`, min 1 / max 10 / CPU 60%)                                      | ✅        |
 | `make demo`                                 | Deploy + seed enxuto + smoke das 3 jornadas. `DEMO_FRESH=1` recria o cluster do zero            | ✅        |
-| `make load SCENARIO=1replica|3replicas|hpa` | Bateria k6 (10/50/100/500/1000 VUs)                                                             | 🚧 D4/D5 |
+| `make load SCENARIO=1replica|3replicas-off|3replicas-on|hpa` | Bateria k6 (10/50/100/500/1000 VUs) — ver `loadtest/README.md`                  | ✅ (falta medir) |
+| `make plot`                                 | Summaries do k6 → `docs/evidencias/resultados.csv` + PNGs                                       | ✅        |
 | `make help`                                 | Lista os alvos                                                                                  | ✅        |
 
 

@@ -140,10 +140,10 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
 - [ ] **Mateus** **Logging estruturado** (JSON) com `username`/`role`/`nivel`/`patient_id` — alimenta a auditoria e o tracing ➕
 - [ ] **Mateus** **Erro gRPC→HTTP**: hoje qualquer `onError` vira 500. `INVALID_ARGUMENT`→400, `NOT_FOUND`→404 (paciente inexistente hoje estoura 500)
 - [ ] **Mateus** Probes _dependency-aware_ (readiness checa o DB)
-- [ ] **Mateus** + **Guilherme** Pool de **JWTs pré-gerados** (`loadtest/**/tokens.json`, TTL ~30 min) — Keycloak fora do caminho da carga
-- [ ] **Carlos** + **Mateus** `loadtest/k6/scenario.js` (mix dos 3 perfis) + `warmup.sh` + `reset-state.sh` — **Mateus** define as rotas, **Carlos** o perfil de carga
-- [ ] **Carlos** `make load SCENARIO=1replica` roda os **5 níveis (10/50/100/500/1000 VUs)** (`make load` é **stub**)
-- [ ] **Carlos** `collect-metrics.sh` → `resultados.csv` (throughput, latência méd+**p95/p99**, CPU, mem, erro, db_tps)
+- [x] Pool de **JWTs pré-gerados** — `loadtest/gen-tokens.sh` gera `tokens.json` (mix 60/20/20, `seed=42`, TTL 30 min). _Arthur adiantou o harness (Trilha D)._
+- [x] `loadtest/k6/scenario.js` (mix dos 3 perfis, rotas 200 coerentes com o seed) + warm-up e reset de estado embutidos em `run-load-tests.sh`. _Arthur adiantou._
+- [ ] **Carlos** `make load SCENARIO=1replica` **roda** os **5 níveis (10/50/100/500/1000 VUs)** — harness pronto (`make load`/`make plot` reais), **falta executar e coletar**
+- [ ] **Carlos** `make plot` → `resultados.csv` + PNGs (throughput, latência méd+**p95**, CPU, mem, erro) — script pronto (`collect-metrics.sh` opcional p/ server-side), **falta rodar**
 
 ### 🚦 Portão 5 = M4 — Escalabilidade + HPA, Fases (c)+(d) (D5) 🟡
 - [x] **Arthur** **Fix gRPC LB implementado** — Service **headless** (`k8s/base/grpc-headless.yaml`) + `round_robin`. **Diagnóstico corrigido:** o `net.devh` 3.1.0 **já usa `round_robin` como default**; o bug era só o ClusterIP resolver para 1 IP virtual (round-robin sobre uma lista de 1 elemento) enquanto o HTTP/2 multiplexa tudo numa conexão. Toggle `make grpc-lb-on|off` preserva o "antes" do §7.3 → **Carlos destravado** (não há mais dependência de calendário)
@@ -198,7 +198,7 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
 | **loadtest** | **Carlos** | ⬜ | vazio (só `.gitkeep`) | `loadtest/` |
 | **frontend** | **Guilherme** | ⬜ | vazio (só `.gitkeep`) — **obrigatório mínimo** (§9.1: login OIDC + 3 consultas), mas P2 e 1º a cortar | `frontend/` · client `hospital-frontend` no realm |
 | **tracing (OTel+Tempo)** | **Guilherme** | ⬜ ➕ | inexistente (bônus) | — |
-| **Makefile** | **Arthur** | 🟡 | `rebuild`, `demo`, `scale`, `pods-wide`, `grpc-lb-on|off`, `hpa-on|off` reais; só `load` é stub (Trilha D) | `Makefile` |
+| **Makefile** | **Arthur** | ✅ | todos os alvos reais: `rebuild`, `demo`, `scale`, `pods-wide`, `grpc-lb-on|off`, `hpa-on|off`, e agora `load`/`plot` (harness k6 em `loadtest/`) | `Makefile` |
 
 ---
 
@@ -215,7 +215,7 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
 >
 > **O caminho crítico agora é a fase (b): carga.** O código de infra existe; faltam os **números**.
 
-1. **Carlos** · **⭐🔴 loadtest + `make load`** _(Portão 4)_ — `scenario.js`, `run-load-tests.sh`, pool `tokens.json`, `collect-metrics.sh`; rodar `1replica`. **Destravado** (as 3 rotas existem; os alvos de cenário existem).
+1. **Carlos** · **⭐🔴 RODAR `make load`** _(Portão 4)_ — o harness está **pronto** (`scenario.js`, `gen-tokens.sh`, `run-load-tests.sh`, `collect-metrics.sh`, `plot.py`; `make load`/`make plot` reais). Falta **executar** a bateria (`1replica` primeiro) e coletar os números. Pré-req: `k6`+`jq` na WSL. Ver `loadtest/README.md`.
 2. **Arthur** · **⭐ Evidências de escala** _(Portão 5)_ — `kubectl get hpa` com `%/60%`, `get hpa -w` sob carga, `make pods-wide`. Sem isso o manifesto não vale nota.
 3. **Carlos** · **⭐ 3replicas + HPA medidos** _(Portão 5)_ — as duas baterias restantes. **Não depende mais do Arthur** (toggle).
 4. **Guilherme** · **⭐ Dashboards RED/USE** _(Portão 4)_ — JSON versionado + ≥5 métricas + screenshots.
