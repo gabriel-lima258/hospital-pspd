@@ -1,6 +1,6 @@
 # Makefile — Hospital Universitário (PSPD/UnB). Tudo que repete vira alvo (regra de ouro 4).
 .PHONY: up rebuild down logs cluster cluster-down grafana check-cluster-tools images deploy redeploy \
-        seed seed-local grpc-lb-on grpc-lb-off hpa-on hpa-off scale pods-wide watch-hpa load demo help
+        seed seed-local grpc-lb-on grpc-lb-off hpa-on hpa-off scale pods-wide watch-hpa load plot demo help
 
 # Nome do cluster kind (usado por cluster / cluster-down / deploy futuro).
 KIND_CLUSTER ?= pspd
@@ -208,9 +208,16 @@ hpa-off: check-cluster-tools
 	kubectl delete -f k8s/hpa --ignore-not-found
 	@echo "OK. HPA removido. As réplicas ficaram onde estavam — use 'make scale N=' p/ fixá-las."
 
-load:
-	@echo "[TODO D4/D5 — Trilha D] bateria k6 (10/50/100/500/1000 VUs). SCENARIO=$(SCENARIO)"
-	@echo "Prepare o cenário com: make scale / make grpc-lb-on|off / make hpa-on|off (ver README)."
+# Bateria k6 dos 5 níveis para um cenário. Prepara o estado do cluster, port-forward efêmero,
+# warm-up + 3min + cool-down por nível, summary-export → loadtest/out/. Ver loadtest/README.md.
+# SCENARIO: 1replica | 3replicas-off | 3replicas-on | hpa
+SCENARIO ?= 1replica
+load: check-cluster-tools
+	loadtest/run-load-tests.sh $(SCENARIO)
+
+# Gera CSV mestre + PNGs (throughput/p95/1v3) a partir dos summaries em loadtest/out/.
+plot:
+	python3 loadtest/plot.py
 
 # ── Demo ponta-a-ponta (M1 / Portão 7) ───────────────────────────────────────
 # Default reusa o cluster (~2 min). DEMO_FRESH=1 recria do zero (~12 min) — é o que o Portão 7
