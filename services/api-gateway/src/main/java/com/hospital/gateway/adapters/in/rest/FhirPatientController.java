@@ -52,6 +52,7 @@ public class FhirPatientController {
         if (!authz.getAllow()) {
             return ResponseEntity.status(403).build();
         }
+        org.slf4j.MDC.put("nivel", authz.getNivel());   // auditoria: nível servido (AccessLogFilter loga)
 
         // 2) Busca dos dados clínicos crus.
         ClinicalData data = patientDataStub.fetch(PatientQuery.newBuilder()

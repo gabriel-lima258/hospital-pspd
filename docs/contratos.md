@@ -90,6 +90,13 @@ após a autenticação a todas as rotas exceto `/actuator/**`. Estourou → **42
 `GATEWAY_RATELIMIT_ENABLED` desliga (usado na bateria k6). Estado por instância → com N réplicas o
 teto efetivo é N× o configurado.
 
+**Log de acesso** (`AccessLogFilter`) — cada requisição de negócio emite uma linha JSON `http_access`
+no stdout (via `logstash-logback-encoder`), com os campos de auditoria: `username`
+(`preferred_username`), `role`, `nivel` (do `AuthzReply`), `patient_id`/`projeto_id` (do path),
+`method`, `path`, `status`, `duration_ms`. Filtro mais externo da cadeia → captura o 429 do rate
+limiting e o 404 de recurso inexistente. Formato pronto para Promtail→Loki (campos consultáveis sem
+regex). `/actuator/**` não é logado.
+
 **Enforcement do nível** (Data Transform, desde o P3b) — o nível **decide a forma da saída**, não anota o dado:
 
 | Nível | Saída | Mantém | Remove |

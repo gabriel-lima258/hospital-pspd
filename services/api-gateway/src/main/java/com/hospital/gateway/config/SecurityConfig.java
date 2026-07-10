@@ -13,6 +13,7 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 
+import com.hospital.gateway.observability.AccessLogFilter;
 import com.hospital.gateway.ratelimit.RateLimitFilter;
 import com.hospital.gateway.ratelimit.RateLimitProperties;
 
@@ -35,8 +36,10 @@ public class SecurityConfig {
                 .requestMatchers("/actuator/**").permitAll()
                 .anyRequest().authenticated())
             .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()))
-            // após a validação do Bearer → o SecurityContext já tem o usuário para chavear o limite.
-            .addFilterAfter(new RateLimitFilter(rateLimitProps), BearerTokenAuthenticationFilter.class);
+            // Ordem após o Bearer: AccessLog (externo, loga inclusive o 429) → RateLimit (interno).
+            // Ambos precisam do SecurityContext populado, por isso vêm depois da autenticação.
+            .addFilterAfter(new AccessLogFilter(), BearerTokenAuthenticationFilter.class)
+            .addFilterAfter(new RateLimitFilter(rateLimitProps), AccessLogFilter.class);
         return http.build();
     }
 

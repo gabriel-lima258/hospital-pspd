@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Logging estruturado em JSON no stdout (12-factor): o container só escreve; a coleta é do
+  Promtail/Alloy → Loki. O LogstashEncoder já serializa todo o MDC como campos JSON de topo, então
+  as chaves que o AccessLogFilter/controllers colocam (username, role, nivel, patient_id, status,
+  duration_ms) viram campos consultáveis (ex.: {nivel="PARTIAL"} no Grafana), sem regex.
+-->
+<configuration>
+    <appender name="json" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <includeContext>false</includeContext>
+            <fieldNames>
+                <timestamp>ts</timestamp>
+                <message>msg</message>
+                <logger>logger</logger>
+                <thread>thread</thread>
+                <levelValue>[ignore]</levelValue>
+            </fieldNames>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="json"/>
+    </root>
+</configuration>

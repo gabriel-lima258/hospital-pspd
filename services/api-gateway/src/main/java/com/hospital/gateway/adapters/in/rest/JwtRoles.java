@@ -12,7 +12,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
  * Service (fonte única). Aqui só se traduz o claim para a string que viaja no {@code AuthzRequest}.
  * Role ausente ou fora do domínio vira {@code ""} → o Authorization responde DENY.
  */
-final class JwtRoles {
+public final class JwtRoles {
 
     private static final Set<String> CONHECIDAS = Set.of("MEDICO", "ESTAGIARIO", "PESQUISADOR");
 
@@ -20,7 +20,7 @@ final class JwtRoles {
     }
 
     /** Primeira role conhecida em {@code realm_access.roles}; {@code ""} se não houver nenhuma. */
-    static String extractRole(Jwt jwt) {
+    public static String extractRole(Jwt jwt) {
         Object realmAccess = jwt.getClaim("realm_access");
         if (realmAccess instanceof java.util.Map<?, ?> map && map.get("roles") instanceof List<?> roles) {
             for (Object r : roles) {

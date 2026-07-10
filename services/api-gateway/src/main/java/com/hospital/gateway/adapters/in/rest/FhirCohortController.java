@@ -80,6 +80,7 @@ public class FhirCohortController {
             if (!authz.getAllow()) {
                 return ResponseEntity.status(403).build();
             }
+            org.slf4j.MDC.put("nivel", authz.getNivel());   // auditoria: nível servido (AccessLogFilter loga)
 
             // 2) Dados crus da coorte AUTORIZADA — coorte_codigo vem do AuthzReply, nunca do cliente.
             ClinicalData data = patientDataStub.fetch(PatientQuery.newBuilder()
