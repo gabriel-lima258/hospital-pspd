@@ -9,6 +9,7 @@
 | `patient-data-coorte.md` | D3 · P3a | agregação de coorte e amostra de exames (com `EXPLAIN`) |
 | `data-transform-niveis.md` | D3 · P3b | enforcement por nível + os 5 recursos FHIR |
 | `pesquisador-coorte.md` | D3 · **P3c** | as **3 jornadas REST**; a coorte nasce no servidor; 400/403/404/502 |
+| `escala-hpa-grpc-lb.md` | D5 · Portão 5 | 🚧 **protocolo, sem medição ainda** — headless × ClusterIP, HPA, §7.2 e §7.3 |
 | `*http_server_requests*.json` | D2 · M1 | scrape do Gateway no Prometheus/Grafana |
 
 > Evidências antigas **não são reescritas** quando o código evolui: elas registram o que era verdade

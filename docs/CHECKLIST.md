@@ -7,10 +7,14 @@
 > [`docs/Roteiro_PSPD_Observabilidade_K8S.md`](Roteiro_PSPD_Observabilidade_K8S.md) (§3 cronograma,
 > §5 métricas, §7 descobertas, §9 entrega, **Apêndice A** portões 0–7).
 >
-> **Última atualização:** 2026-07-09 · **Fase atual:** **D4 / M3** (observabilidade + 1ª bateria de carga).
+> **Última atualização:** 2026-07-10 · **Fase atual:** **D4 / M3** (observabilidade + 1ª bateria de carga).
 > O **M2 fechou**: P3a ✅ fonte de dados de coorte · P3b ✅ enforcement por nível + FHIR completo ·
 > P3c ✅ rota REST de coorte — as **3 jornadas** (médico/FULL, estagiário/PARTIAL, pesquisador/AGG+ANON)
-> validadas ponta-a-ponta no cluster. Daqui em diante a nota vem de **números medidos**.
+> validadas ponta-a-ponta no cluster.
+>
+> A **Trilha A** entregou a infra de escala: Service headless + `round_robin`, HPA (min1/max10/CPU 60%),
+> toggles `grpc-lb-on|off` / `hpa-on|off` / `scale N=`, e `make demo` real. **Nada disso foi medido ainda.**
+> Daqui em diante a nota vem exclusivamente de **números medidos**.
 
 **Legenda:** ✅ feito · 🟡 parcial · ⬜ a fazer · ➕ bônus (ponto extra) · 🔴 crítico
 **Donos:** cada item pendente começa com o nome do responsável — ver a divisão de trilhas no §0.
@@ -53,12 +57,13 @@ o Gabriel faz o *handoff* (o commit é histórico, a responsabilidade não).
 
 ### Caminho crítico (quem não pode atrasar)
 
-⭐ **Arthur** e **Carlos** carregam os **80%** da nota: sem `round_robin` + HPA não há o que medir;
+⭐ **Arthur** e **Carlos** carregam os **80%** da nota: sem balanceamento gRPC + HPA não há o que medir;
 sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro ajuda os dois — e o
 **frontend do Guilherme é o primeiro a cortar** (§ordem de corte).
 
-**Dependência dura:** **Arthur** precisa entregar o `round_robin` **antes** de **Carlos** rodar a bateria de 3 réplicas
-(senão mede-se o gRPC grudado em 1 pod, não a arquitetura).
+~~**Dependência dura:** Arthur precisa entregar o fix antes de Carlos medir.~~ **Resolvida:** o fix é um
+**toggle** (`make grpc-lb-on|off`), então os dois estados coexistem e o Carlos não espera ninguém. O que
+**Arthur ainda deve** ao grupo são as **evidências** (`get hpa -w`, `pods-wide`) — manifesto sem print não vale nota.
 
 ---
 
@@ -109,7 +114,7 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
 - [x] 4 targets **UP** no Prometheus · `k8s/observability/servicemonitor.yaml`
 - [x] Métrica `http_server_requests_seconds_count{application="api-gateway"}` visível no Grafana
 - [ ] **Guilherme** 🟡 **PNG do Grafana** ainda **manual** (automação de browser não alcançou o port-forward) · ver `docs/evidencias/README.md`
-- [ ] **Arthur** `make demo` reproduz do zero (**stub** — TODO)
+- [x] **Arthur** `make demo` implementado (deploy + seed enxuto + smoke das 3 jornadas; `DEMO_FRESH=1` recria o cluster) — **falta rodar `DEMO_FRESH=1` uma vez** e registrar a saída
 - 📎 Evidências: `docs/evidencias/{seed-volume-cluster.md, *http_server_requests*.json}`
 
 ### 🚦 Portão 3 = M2 — Validação funcional, Fase (a) (D3) ✅
@@ -140,12 +145,13 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
 - [ ] **Carlos** `make load SCENARIO=1replica` roda os **5 níveis (10/50/100/500/1000 VUs)** (`make load` é **stub**)
 - [ ] **Carlos** `collect-metrics.sh` → `resultados.csv` (throughput, latência méd+**p95/p99**, CPU, mem, erro, db_tps)
 
-### 🚦 Portão 5 = M4 — Escalabilidade + HPA, Fases (c)+(d) (D5) ⬜
-- [ ] **Arthur** 🔴 **Fix gRPC LB ANTES de medir**: Service **headless** + `defaultLoadBalancingPolicy: round_robin` (hoje ClusterIP, gruda em 1 pod) — **bloqueia **Carlos****
+### 🚦 Portão 5 = M4 — Escalabilidade + HPA, Fases (c)+(d) (D5) 🟡
+- [x] **Arthur** **Fix gRPC LB implementado** — Service **headless** (`k8s/base/grpc-headless.yaml`) + `round_robin`. **Diagnóstico corrigido:** o `net.devh` 3.1.0 **já usa `round_robin` como default**; o bug era só o ClusterIP resolver para 1 IP virtual (round-robin sobre uma lista de 1 elemento) enquanto o HTTP/2 multiplexa tudo numa conexão. Toggle `make grpc-lb-on|off` preserva o "antes" do §7.3 → **Carlos destravado** (não há mais dependência de calendário)
+- [x] **Arthur** **HPA** v2 criado (min 1 / max 10 / CPU 60%, 4 serviços) · `k8s/hpa/hpa.yaml` · fora do `make deploy` para não contaminar os cenários de réplica fixa
+- [x] **Arthur** `replicas:` removido dos 4 Deployments (senão `kubectl apply` reseta a escala no meio da medição)
+- [ ] **Arthur** `kubectl get hpa` mostra `%/60%` (não `<unknown>`); escala automática evidenciada no tempo — **falta rodar e capturar**
+- [ ] **Arthur** Distribuição de pods entre os 3 workers (`make pods-wide`, screenshot) — **falta capturar**
 - [ ] **Carlos** `make load SCENARIO=3replicas` (3 réplicas) medido nos 5 níveis; comparação vs 1 réplica
-- [ ] **Arthur** Distribuição de pods entre os 3 workers (`kubectl get pods -o wide`, screenshot)
-- [ ] **Arthur** **HPA** v2 aplicado (min 1 / max 10 / CPU 60%) — **manifesto ausente** (`requests.cpu` já pronto)
-- [ ] **Arthur** `kubectl get hpa` mostra `%/60%` (não `<unknown>`); escala automática evidenciada no tempo
 - [ ] **Carlos** **Limite de escalabilidade** identificado (satura no Postgres) + impacto no banco documentado (USE)
 
 ### 🚦 Portão 6 = M5 — Ponto extra + reteste + análise (D6) ⬜ ➕
@@ -185,14 +191,14 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
 | **data-transform** | **Gabriel** | ✅ | **Completo** (P3b): enforcement por `nivel` + 5 recursos FHIR + `MeasureReport`; 37 testes JUnit | `domain/FhirTransformer`, `domain/PatientAnonymizer` |
 | **db** | **Carlos** | ✅ | schema (5 tabelas+índices), seed volume + seed-min, fixtures negativos (`PRJ02`/`PRJ03`/`PRJ04`) | `db/*` |
 | **keycloak** | **Guilherme** | ✅ | realm + roles + 4 usuários + get-token | `keycloak/*` |
-| **k8s/base** | **Arthur** | ✅ | 6 Deployments/Services, `requests.cpu` setado | `k8s/base/*` |
+| **k8s/base** | **Arthur** | ✅ | 6 Deployments/Services, `requests.cpu` setado, `replicas:` removido, 3 Services headless | `k8s/base/*` |
 | **k8s/observability** | **Guilherme** | 🟡 | só ServiceMonitor; **sem dashboard JSON** | `k8s/observability/servicemonitor.yaml` |
-| **HPA** | **Arthur** | ⬜ | manifesto ausente (`requests.cpu` já pronto) | `k8s/base/hpa.yaml` (a criar) |
-| **Services gRPC** | **Arthur** | 🟡 | ClusterIP normal — **sem headless + round_robin** (não balanceia) | `k8s/base/*.yaml`, gateway `application.yml` |
+| **HPA** | **Arthur** | 🟡 | manifesto pronto (v2, min1/max10, CPU 60%, 4 serviços); **falta aplicar e evidenciar `%/60%`** | `k8s/hpa/hpa.yaml` |
+| **Services gRPC** | **Arthur** | 🟡 | headless + `round_robin` é o **default**; toggle `grpc-lb-off` reproduz o ClusterIP p/ o §7.3. **Falta medir antes/depois** | `k8s/base/grpc-headless.yaml`, gateway `application.yml` |
 | **loadtest** | **Carlos** | ⬜ | vazio (só `.gitkeep`) | `loadtest/` |
 | **frontend** | **Guilherme** | ⬜ | vazio (só `.gitkeep`) — **obrigatório mínimo** (§9.1: login OIDC + 3 consultas), mas P2 e 1º a cortar | `frontend/` · client `hospital-frontend` no realm |
 | **tracing (OTel+Tempo)** | **Guilherme** | ⬜ ➕ | inexistente (bônus) | — |
-| **Makefile** | **Arthur** | 🟡 | reais menos `load`/`demo` (stubs); `rebuild` no `.PHONY` sem corpo | `Makefile` |
+| **Makefile** | **Arthur** | 🟡 | `rebuild`, `demo`, `scale`, `pods-wide`, `grpc-lb-on|off`, `hpa-on|off` reais; só `load` é stub (Trilha D) | `Makefile` |
 
 ---
 
@@ -201,25 +207,27 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
 > Ordem por impacto na nota. ⭐ = **caminho crítico dos 80%** (fases medidas com números).
 > O emoji no início é o **dono** (§0).
 
-> ~~1. **Gabriel** · (P3c) Fechar o M2 — rota de coorte do pesquisador~~ ✅ **feito** — `AuthzReply.coorte_codigo`
-> + `FhirCohortController`; as 3 jornadas validadas no cluster (`docs/evidencias/pesquisador-coorte.md`).
-> **O caminho crítico agora é a fase (b): carga.**
+**Já fechados** (não reabrir):
+> ~~**Gabriel** · (P3c) rota de coorte do pesquisador~~ ✅ `AuthzReply.coorte_codigo` + `FhirCohortController`; as 3 jornadas validadas no cluster (`docs/evidencias/pesquisador-coorte.md`).
+> ~~**Arthur** · gRPC round_robin~~ ✅ o fix era o **Service headless**, não a policy (`round_robin` já é default no `net.devh` 3.1.0). Toggle `make grpc-lb-on|off`.
+> ~~**Arthur** · HPA~~ ✅ `k8s/hpa/hpa.yaml`, aplicado só por `make hpa-on`.
+> ~~**Arthur** · `make demo`~~ ✅ implementado (`DEMO_FRESH=1` recria o cluster).
+>
+> **O caminho crítico agora é a fase (b): carga.** O código de infra existe; faltam os **números**.
 
-1. **Arthur** · **⭐🔴 gRPC round_robin** _(Portão 5, mas pré-requisito de qualquer carga com réplicas)_ — Service headless (`clusterIP: None`) + `defaultLoadBalancingPolicy: round_robin` no client. **Bloqueia o item 4 do Carlos.**
-2. **Carlos** · **⭐🔴 loadtest + `make load`** _(Portão 4)_ — `scenario.js`, `run-load-tests.sh`, pool `tokens.json`, `collect-metrics.sh`; rodar `1replica`. **Agora destravado** (as 3 rotas do cenário existem).
-3. **Arthur** · **⭐ HPA** _(Portão 5)_ — `k8s/base/hpa.yaml` (autoscaling/v2, min1/max10, CPU 60%).
-4. **Carlos** · **⭐ 3replicas + HPA medidos** _(Portão 5)_ — as duas baterias restantes. **Depende do item 1 (Arthur).**
-5. **Guilherme** · **⭐ Dashboards RED/USE** _(Portão 4)_ — JSON versionado + ≥5 métricas + screenshots.
-6. **Carlos** · **⭐ `plot.py` + CSVs → PNGs** _(Portão 6)_ — gráficos comparativos.
-7. **Guilherme** · **➕ Tracing (OTel + Tempo)** _(Portão 6)_ — melhor ROI de bônus.
-8. **Mateus** · **Gateway maduro** _(Portão 4)_ — rate limiting + logging estruturado + erro gRPC→HTTP **global** via `@ControllerAdvice` (hoje `/fhir/Patient/{id}` ainda transforma qualquer `onError` em 500: paciente inexistente devolve 500, não 404; o `INVALID_ARGUMENT` do data-transform vira 500, não 400). A rota de coorte já faz isso localmente — usar como referência e **não** regredir os 400/403/404/502 dela; readiness que checa o DB.
-9. **Guilherme** · **frontend mínimo** _(§9.1 / §9.7 · Portão 3+7)_ — **obrigatório, mas mínimo e P2** (baixo valor isolado; **primeiro a cortar** sob pressão — ordem de corte §R9: frontend rico → FHIR 100% → cenários extras).
+1. **Carlos** · **⭐🔴 loadtest + `make load`** _(Portão 4)_ — `scenario.js`, `run-load-tests.sh`, pool `tokens.json`, `collect-metrics.sh`; rodar `1replica`. **Destravado** (as 3 rotas existem; os alvos de cenário existem).
+2. **Arthur** · **⭐ Evidências de escala** _(Portão 5)_ — `kubectl get hpa` com `%/60%`, `get hpa -w` sob carga, `make pods-wide`. Sem isso o manifesto não vale nota.
+3. **Carlos** · **⭐ 3replicas + HPA medidos** _(Portão 5)_ — as duas baterias restantes. **Não depende mais do Arthur** (toggle).
+4. **Guilherme** · **⭐ Dashboards RED/USE** _(Portão 4)_ — JSON versionado + ≥5 métricas + screenshots.
+5. **Carlos** · **⭐ `plot.py` + CSVs → PNGs** _(Portão 6)_ — gráficos comparativos.
+6. **Guilherme** · **➕ Tracing (OTel + Tempo)** _(Portão 6)_ — melhor ROI de bônus.
+7. **Mateus** · **Gateway maduro** _(Portão 4)_ — rate limiting + logging estruturado + erro gRPC→HTTP **global** via `@ControllerAdvice` (hoje `/fhir/Patient/{id}` ainda transforma qualquer `onError` em 500: paciente inexistente devolve 500, não 404; o `INVALID_ARGUMENT` do data-transform vira 500, não 400). A rota de coorte já faz isso localmente — usar como referência e **não** regredir os 400/403/404/502 dela; readiness que checa o DB.
+8. **Guilherme** · **frontend mínimo** _(§9.1 / §9.7 · Portão 3+7)_ — **obrigatório, mas mínimo e P2** (baixo valor isolado; **primeiro a cortar** sob pressão — ordem de corte §R9: frontend rico → FHIR 100% → cenários extras).
    - **Objetivo:** 1 SPA enxuta que autentica via **OAuth2/OIDC no Keycloak** (client `hospital-frontend`, Standard Flow) e faz as **3 consultas** (médico→FULL, estagiário→PARTIAL, pesquisador→coorte), renderizando conforme o nível retornado.
    - **Arquivos-alvo:** `frontend/` (hoje só `.gitkeep`) · client `hospital-frontend` já existe no `keycloak/realm-export.json` (`redirectUris`/`webOrigins` = `http://localhost:*`).
    - **DoD:** loga com `med.cardoso`/`est.almeida`/`pesq.souza`, envia `Authorization: Bearer` ao gateway, mostra as 3 respostas (inclusive um DENY→403). Serve principalmente ao **vídeo/demo (D7)**, não aos pontos técnicos.
    - **Destravado:** o M2 fechou. As 3 rotas existem: `GET /fhir/Patient/{id}` (médico/estagiário) e `GET /fhir/cohort/{projetoId}?tipo=ResumoCoorte|ExamesCoorte` (pesquisador).
-10. **Arthur** · **`make demo`** _(Portão 2/7)_ — reprodução ponta-a-ponta.
-11. **Guilherme** · **Relatório §9 + vídeo** _(Portão 7)_ — escrever incrementalmente, não deixar p/ o fim. Cada trilha entrega a sua seção; **o Guilherme consolida** e entrega.
+9. **Guilherme** · **Relatório §9 + vídeo** _(Portão 7)_ — escrever incrementalmente, não deixar p/ o fim. Cada trilha entrega a sua seção; **o Guilherme consolida** e entrega.
 
 ---
 
@@ -229,8 +237,14 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
   evidência USE: CPU do Postgres ~100%, `hikaricp_connections_pending > 0`, timeouts, `db_tps` no platô.
   _Insumo já colhido: o Seq Scan de 425 ms em `freqMedicamentos` (§7 abaixo)._
 - [ ] **Arthur** **§7.2 — HPA × cold-start da JVM** — pod novo leva 20–40s p/ ficar Ready → latência piora antes de melhorar.
-- [ ] **Arthur** + **Carlos** **§7.3 — gRPC sobre Service não balanceia** — HTTP/2 multiplexa 1 conexão → 1 pod recebe ~100%;
-  **Arthur** faz o fix, **Carlos** mede **antes e depois** do `round_robin` (a medição do "antes" precisa acontecer **antes** do fix).
+  _Segundo fator descoberto:_ além do cold-start, há a **defasagem de re-resolução DNS** (EndpointSlice → registro A →
+  cache da JVM → próxima resolução do grpc-java). Mitigado em parte com `-Dsun.net.inetaddr.ttl=5`
+  (⚠️ `-Dnetworkaddress.cache.ttl` **não funciona**: é security property de `java.security`). Medir o lag residual.
+- [ ] **Arthur** + **Carlos** **§7.3 — gRPC sobre Service ClusterIP não balanceia** — o DNS devolve **1 IP virtual**,
+  o HTTP/2 multiplexa tudo numa conexão de longa duração e o `kube-proxy` balanceia conexões, não requisições → 1 pod recebe ~100%.
+  **Correção do diagnóstico original:** o `round_robin` **já era o default** do `net.devh` 3.1.0 — ele fazia round-robin sobre uma
+  lista de 1 endereço. O fix é o **Service headless**. **Arthur** entregou o fix + o toggle; **Carlos** mede
+  `make grpc-lb-off` (antes) e `make grpc-lb-on` (depois) — **sem dependência de ordem**, os dois estados coexistem.
 
 ## 6. Métricas mínimas exigidas (§5 / §9.5) — status ⬜
 
@@ -250,12 +264,13 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
 - **Sem índice em `clinical_events(tipo_evento)`** — a agregação de medicamentos faz Seq Scan (~425 ms em 1,36M linhas). É **insumo do §7.1**, não bug: `schema.sql` é contrato congelado. Mitigação (`ix_events_pac_tipo`) documentada, não aplicada.
 - **`JwtRoles.extractRole` pega a *primeira* role conhecida** 🟡 — a ordem de `realm_access.roles` não é garantida, então um usuário com duas roles do domínio (ex.: MEDICO + PESQUISADOR) pode ser roteado pela errada. **Não é escalonamento** (o ALLOW ainda exige vínculo ou projeto), mas é arbitrário. Fix natural: escolher a role pelo tipo de rota, ou rejeitar tokens multi-role.
 - **Erro gRPC→HTTP só na rota de coorte** 🟡 — `FhirCohortController` mapeia 400/403/404/502; `/fhir/Patient/{id}` ainda devolve 500 genérico. Fecha no item 8 do backlog (**Mateus**).
-- **gRPC pin em 1 pod** — até o `round_robin`, testes com réplicas não mostram escala.
+- ~~**gRPC pin em 1 pod**~~ ✅ **resolvido** — Service headless (`k8s/base/grpc-headless.yaml`) é o default; `make grpc-lb-off` reproduz o arranjo antigo de propósito, para o "antes" do §7.3.
+- ~~**`make demo` / `rebuild`**~~ ✅ **implementados**. `make demo DEMO_FRESH=1` ainda **não foi rodado ponta-a-ponta** — validar antes do D7.
 - **PNG do Grafana manual** — automação de browser não alcança o port-forward local; capturar à mão.
-- **`make demo` / `rebuild`** — pendentes (stub / `.PHONY` sem corpo).
+- **`JAVA_TOOL_OPTIONS` imprime aviso no stdout** 🟡 — a JVM loga `Picked up JAVA_TOOL_OPTIONS: …` no boot de cada pod do gateway. Cosmético; se o logging estruturado (item 7 do backlog) exigir stdout limpo, mover as flags para o `ENTRYPOINT` do Dockerfile.
 - **Postgres 1 réplica = gargalo esperado** — é **feature** p/ a descoberta §7.1, **não** bug. Não "consertar"; medir e documentar.
 - **Distribuição desigual do trabalho** 🔴 — o **Gabriel** adiantou código de 4 trilhas (authorization=B, seed=D, k8s=A, keycloak=E). O enunciado avalia **"percepção de equilíbrio na distribuição de tarefas"**, e o vídeo expõe quem fez o quê. Mitigação: o *handoff* do §0 + **cada dono faz ao menos um commit substantivo** na peça herdada antes do D7.
-- **Dependência Arthur → Carlos** 🔴 — sem o `round_robin` do Arthur, a bateria de 3 réplicas do Carlos mede o gRPC grudado em 1 pod. Mas a medição do **"antes"** do §7.3 precisa ser colhida **antes** do fix — combinar a ordem, não improvisar.
+- ~~**Dependência Arthur → Carlos**~~ ✅ **eliminada** — o fix de LB virou **toggle de runtime** (`make grpc-lb-on|off`) em vez de edição destrutiva. Os dois estados coexistem no repo; o Carlos roda as baterias na ordem que quiser. Resta uma pegadinha: como o **default passou a ser o correto**, a rodada "antes" do §7.3 exige `make grpc-lb-off` **explícito**.
 - **Prazo: 1 semana** — priorizar trilhas **A (K8S), C (dados/transform), D (carga)** — são os 80% (§2.1). Frontend rico e FHIR 100% são os primeiros cortes (§ ordem de corte).
 
 ---

@@ -92,6 +92,14 @@ services:
         condition: service_started
       data-transform:
         condition: service_started
+    environment:
+      # O default do application.yml aponta para os Services headless do K8S, que não existem
+      # na rede do compose. Aqui os nomes são os dos próprios serviços do compose, e com um
+      # container por serviço não há o que balancear → pick_first.
+      GRPC_AUTHORIZATION_ADDRESS: 'dns:///authorization:9090'
+      GRPC_PATIENT_DATA_ADDRESS: 'dns:///patient-data:9090'
+      GRPC_DATA_TRANSFORM_ADDRESS: 'dns:///data-transform:9090'
+      GRPC_LB_POLICY: pick_first
     ports:
       - "9000:9000"     # único serviço publicado no host (REST)
     healthcheck:

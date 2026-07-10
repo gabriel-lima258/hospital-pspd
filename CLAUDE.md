@@ -40,7 +40,7 @@ proto/            # contrato gRPC (fonte da verdade) — módulo Gradle :proto
 db/               # schema.sql + seed.py
 services/         # api-gateway, authorization, patient-data, data-transform
 frontend/         # React/Next
-k8s/              # Deployments, Services, HPA, observability/
+k8s/              # base/ (Deployments, Services, headless) · hpa/ · observability/ · jobs/
 loadtest/         # k6/, run-load-tests.sh, plot.py
 keycloak/         # realm-export.json
 docs/             # roteiro, prompts.md, evidencias/
@@ -48,12 +48,15 @@ docs/             # roteiro, prompts.md, evidencias/
 
 ## Comandos
 
-- `make up` — sobe tudo local (docker-compose) para o *inner loop* rápido.
+- `make up` / `make rebuild` — sobe tudo local (docker-compose); `rebuild` recompila as imagens.
 - `make cluster` — cria kind 1+3 + metrics-server + kube-prometheus-stack.
 - `make seed` — popula o banco no volume-alvo (`seed=42`, reprodutível).
-- `make deploy` — build das imagens + `kind load` + aplica `k8s/`.
-- `make load SCENARIO=1replica|3replicas|hpa` — bateria k6 (10/50/100/500/1000 VUs).
-- `make demo` — reproduz o esqueleto ambulante do zero.
+- `make deploy` — build das imagens + `kind load` + aplica `k8s/base` e `k8s/observability` (**não** o HPA).
+- `make scale N=3` · `make pods-wide` — fixa réplicas · distribuição dos pods entre workers.
+- `make grpc-lb-on|off` — headless+`round_robin` (default) × ClusterIP+`pick_first` (o "antes" do §7.3).
+- `make hpa-on|off` — aplica/remove `k8s/hpa/` (min 1 / max 10 / CPU 60%). `hpa-off` não reseta réplicas.
+- `make load SCENARIO=1replica|3replicas|hpa` — bateria k6 (10/50/100/500/1000 VUs). **TODO (Trilha D).**
+- `make demo` — deploy + seed enxuto + smoke das 3 jornadas; `DEMO_FRESH=1` recria o cluster.
 - `./gradlew build` — compila, testa e gera os stubs proto.
 
 ## Convenções
@@ -71,7 +74,8 @@ docs/             # roteiro, prompts.md, evidencias/
 
 - ❌ Teste de carga com banco vazio → semeie volume **antes** (`make seed`).
 - ❌ Deployment sem `resources.requests.cpu` → **o HPA não funciona** (reporta `<unknown>`).
-- ❌ gRPC sobre Service ClusterIP sem `round_robin` → não balanceia entre réplicas (use Service *headless* + `defaultLoadBalancingPolicy: round_robin`).
+- ❌ Deployment **com** `replicas:` declarado + HPA → todo `kubectl apply` reseta a escala no meio da medição. Omita o campo.
+- ❌ gRPC sobre Service **ClusterIP** → não balanceia entre réplicas. A causa é o DNS devolver 1 IP virtual (o `round_robin` já é default no `net.devh` 3.1.0 e não tem sobre o que rodar); o HTTP/2 multiplexa tudo numa conexão só. Fix: Service **headless** (`clusterIP: None`) — `k8s/base/grpc-headless.yaml`.
 - ❌ Keycloak no caminho do teste de carga → gere **JWTs antes** (pool `tokens.json`, TTL longo).
 - ❌ Rodar o k6 na mesma máquina saturada pelo cluster → o cliente vira o gargalo.
 

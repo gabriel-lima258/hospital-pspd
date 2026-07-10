@@ -5,7 +5,7 @@ metadata:
   name: patient-data
   labels: { app: patient-data }
 spec:
-  replicas: 1
+  # `replicas` omitido: quem manda é `kubectl scale` (fase c) ou o HPA (fase d). Ver api-gateway.yaml.
   selector:
     matchLabels: { app: patient-data }
   template:

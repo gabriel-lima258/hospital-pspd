@@ -5,7 +5,7 @@ metadata:
   name: data-transform
   labels: { app: data-transform }
 spec:
-  replicas: 1
+  # `replicas` omitido: quem manda é `kubectl scale` (fase c) ou o HPA (fase d). Ver api-gateway.yaml.
   selector:
     matchLabels: { app: data-transform }
   template:

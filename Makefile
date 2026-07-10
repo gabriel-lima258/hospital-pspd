@@ -1,6 +1,6 @@
 # Makefile — Hospital Universitário (PSPD/UnB). Tudo que repete vira alvo (regra de ouro 4).
-# Dia 1: 'up/down/logs' são reais; os demais são stubs a implementar nas fases indicadas.
-.PHONY: up rebuild down logs cluster cluster-down grafana check-cluster-tools images deploy redeploy seed seed-local load demo help
+.PHONY: up rebuild down logs cluster cluster-down grafana check-cluster-tools images deploy redeploy \
+        seed seed-local grpc-lb-on grpc-lb-off hpa-on hpa-off scale pods-wide load demo help
 
 # Nome do cluster kind (usado por cluster / cluster-down / deploy futuro).
 KIND_CLUSTER ?= pspd
@@ -8,21 +8,35 @@ KIND_CLUSTER ?= pspd
 help:
 	@echo "Alvos disponíveis:"
 	@echo "  make up          - sobe Postgres + Keycloak + os 4 serviços (docker-compose)"
+	@echo "  make rebuild     - recompila as imagens do compose e sobe (use após mexer em services/**)"
 	@echo "  make down        - derruba o ambiente local"
 	@echo "  make logs        - segue os logs do ambiente local"
 	@echo "  make cluster     - cria kind 1+3 + metrics-server + kube-prometheus-stack [D1 ✓]"
 	@echo "  make cluster-down - deleta o cluster kind ($(KIND_CLUSTER))"
 	@echo "  make grafana     - port-forward do Grafana em http://localhost:3000 (admin + senha do secret)"
-	@echo "  make deploy      - build+kind load das imagens + aplica k8s/ no cluster [D2 ✓]"
+	@echo "  make deploy      - build+kind load das imagens + aplica k8s/base + k8s/observability [D2 ✓]"
 	@echo "  make redeploy    - rebuild + kind load + rollout restart dos 4 serviços [D2 ✓]"
 	@echo "  make seed        - semeia o banco no CLUSTER via Job (SCALE=$(SCALE), seed=42) [D3 ✓]"
 	@echo "  make seed-local  - semeia o banco do compose (localhost:5433, SCALE=$(SCALE)) [D3 ✓]"
-	@echo "  make load SCENARIO=1replica|3replicas|hpa - bateria k6 [D4/D5 — TODO]"
-	@echo "  make demo        - reproduz o esqueleto ambulante do zero [D2 — TODO]"
+	@echo ""
+	@echo "  Escala e balanceamento (Trilha A — fases c/d):"
+	@echo "  make scale N=3   - fixa as réplicas dos 4 serviços"
+	@echo "  make pods-wide   - kubectl get pods -o wide (distribuição entre os workers)"
+	@echo "  make grpc-lb-on  - gRPC balanceado: Service headless + round_robin (default)"
+	@echo "  make grpc-lb-off - gRPC pinado em 1 pod: ClusterIP + pick_first (o 'antes' do §7.3)"
+	@echo "  make hpa-on      - aplica o HPA (min 1 / max 10 / CPU 60%)"
+	@echo "  make hpa-off     - remove o HPA (siga de 'make scale N=' p/ fixar as réplicas)"
+	@echo ""
+	@echo "  make load SCENARIO=1replica|3replicas|hpa - bateria k6 [D4/D5 — TODO, Trilha D]"
+	@echo "  make demo        - reproduz o esqueleto ambulante (DEMO_FRESH=1 recria o cluster) [D2 ✓]"
 
 # ── Reais (D1) ───────────────────────────────────────────────────────────────
 up:
 	docker compose up -d
+
+# `up` reusa as imagens existentes; depois de mexer em services/** é preciso reconstruir.
+rebuild:
+	docker compose up -d --build
 
 down:
 	docker compose down -v
@@ -134,10 +148,93 @@ seed-local:
 	./.venv/bin/pip install --quiet faker psycopg2-binary
 	./.venv/bin/python db/seed.py --dsn "postgresql://app:app@localhost:5433/hospital" --scale $(SCALE)
 
-load:
-	@echo "[TODO D4/D5] bateria k6 (10/50/100/500/1000 VUs). SCENARIO=$(SCENARIO)"
-	@echo "Próximo passo: prompt P-k6-scripts / §4.9 do roteiro."
+# ── Escala, balanceamento gRPC e HPA (Trilha A, fases c/d) ───────────────────
+# Interface estável consumida pelo loadtest/run-load-tests.sh (Trilha D). Ver README.
+#
+#   1replica              : make hpa-off && make scale N=1
+#   3replicas (§7.3 antes): make grpc-lb-off && make hpa-off && make scale N=3
+#   3replicas (§7.3 depois): make grpc-lb-on && make hpa-off && make scale N=3
+#   hpa                   : make grpc-lb-on && make scale N=1 && make hpa-on
+#
+# Não rode `kubectl apply -f k8s/base` no meio de um cenário: recria o estado.
 
-demo:
-	@echo "[TODO D2] reproduz o esqueleto ambulante: requisição atravessa Gateway->gRPC->3 serviços->Postgres->FHIR->métrica."
-	@echo "Próximo passo: P-walking-skeleton (milestone M1)."
+# Fixa o número de réplicas dos 4 serviços. Espera todos ficarem Ready antes de devolver.
+scale: check-cluster-tools
+	@test -n "$(N)" || { echo "ERRO: uso 'make scale N=<n>'"; exit 1; }
+	kubectl scale --replicas=$(N) $(foreach s,$(SERVICES),deploy/$(s))
+	@for s in $(SERVICES); do kubectl rollout status deploy/$$s --timeout=180s || exit 1; done
+
+pods-wide:
+	kubectl get pods -o wide
+
+# O default do application.yml já é headless+round_robin: `grpc-lb-on` só remove o override.
+# `kubectl set env` é idempotente, dispara o rollout sozinho e sobrevive a `kubectl apply`
+# (as chaves não são declaradas no Deployment — ver k8s/base/api-gateway.yaml).
+grpc-lb-on: check-cluster-tools
+	kubectl set env deploy/api-gateway \
+	  GRPC_AUTHORIZATION_ADDRESS- GRPC_PATIENT_DATA_ADDRESS- \
+	  GRPC_DATA_TRANSFORM_ADDRESS- GRPC_LB_POLICY-
+	kubectl rollout status deploy/api-gateway --timeout=120s
+	@echo "OK. gRPC via Service headless + round_robin (balanceia entre as réplicas)."
+
+# Reproduz o arranjo que não balanceia: ClusterIP resolve p/ 1 IP virtual e o HTTP/2 multiplexa
+# tudo numa conexão só → 1 pod recebe ~100% da carga. É o "antes" da descoberta §7.3.
+grpc-lb-off: check-cluster-tools
+	kubectl set env deploy/api-gateway \
+	  GRPC_AUTHORIZATION_ADDRESS=dns:///authorization:9090 \
+	  GRPC_PATIENT_DATA_ADDRESS=dns:///patient-data:9090 \
+	  GRPC_DATA_TRANSFORM_ADDRESS=dns:///data-transform:9090 \
+	  GRPC_LB_POLICY=pick_first
+	kubectl rollout status deploy/api-gateway --timeout=120s
+	@echo "OK. gRPC via ClusterIP + pick_first (pinado em 1 pod) — cenário 'antes' do §7.3."
+
+hpa-on: check-cluster-tools
+	kubectl apply -f k8s/hpa
+	@echo ">> aguardando o metrics-server popular as métricas (pode levar ~60s)"
+	kubectl get hpa
+
+# Deletar o HPA NÃO reseta a contagem de réplicas — ela fica onde estava.
+hpa-off: check-cluster-tools
+	kubectl delete -f k8s/hpa --ignore-not-found
+	@echo "OK. HPA removido. As réplicas ficaram onde estavam — use 'make scale N=' p/ fixá-las."
+
+load:
+	@echo "[TODO D4/D5 — Trilha D] bateria k6 (10/50/100/500/1000 VUs). SCENARIO=$(SCENARIO)"
+	@echo "Prepare o cenário com: make scale / make grpc-lb-on|off / make hpa-on|off (ver README)."
+
+# ── Demo ponta-a-ponta (M1 / Portão 7) ───────────────────────────────────────
+# Default reusa o cluster (~2 min). DEMO_FRESH=1 recria do zero (~12 min) — é o que o Portão 7
+# pede no ensaio geral, mas destrói o seed de volume, então não é o default.
+DEMO_FRESH ?= 0
+DEMO_SCALE ?= 5000
+
+demo: check-cluster-tools
+	@if [ "$(DEMO_FRESH)" = "1" ]; then \
+	  echo ">> DEMO_FRESH=1 — recriando o cluster do zero (lento, ~12 min)"; \
+	  $(MAKE) cluster-down || true; \
+	  $(MAKE) cluster; \
+	fi
+	$(MAKE) deploy
+	$(MAKE) seed SCALE=$(DEMO_SCALE)
+	@echo ""
+	@echo ">> smoke das 3 jornadas (port-forward efêmero em 8081/9001)"
+	@set -e; \
+	kubectl port-forward svc/keycloak 8081:8080 >/dev/null 2>&1 & KC_PF=$$!; \
+	kubectl port-forward svc/api-gateway 9001:9000 >/dev/null 2>&1 & GW_PF=$$!; \
+	trap 'kill $$KC_PF $$GW_PF 2>/dev/null || true' EXIT; \
+	sleep 5; \
+	TOKEN=$$(KC_PORT=8081 keycloak/get-token.sh med.cardoso); \
+	curl -s -H "Authorization: Bearer $$TOKEN" localhost:9001/fhir/Patient/P000001 \
+	  | jq -r '.entry[].resource.resourceType' | grep -q '^Patient$$' \
+	  && echo "  OK  medico/FULL        -> Patient no Bundle FHIR"; \
+	PTOKEN=$$(KC_PORT=8081 keycloak/get-token.sh pesq.souza); \
+	curl -s -H "Authorization: Bearer $$PTOKEN" \
+	  'localhost:9001/fhir/cohort/PRJ01?tipo=ResumoCoorte' \
+	  | jq -e '.resourceType=="MeasureReport"' >/dev/null \
+	  && echo "  OK  pesquisador/AGG    -> MeasureReport (sem dado individual)"; \
+	NTOKEN=$$(KC_PORT=8081 keycloak/get-token.sh med.semvinculo); \
+	code=$$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $$NTOKEN" \
+	  localhost:9001/fhir/Patient/P000001); \
+	[ "$$code" = "403" ] && echo "  OK  medico sem vínculo -> DENY (403)"; \
+	echo ""; \
+	echo "Esqueleto ambulante de pé. Métrica: make grafana -> http_server_requests_seconds_count{application=\"api-gateway\"}"
