@@ -1,8 +1,5 @@
 package com.hospital.gateway.adapters.in.rest;
 
-import java.util.List;
-import java.util.Set;
-
 import net.devh.boot.grpc.client.inject.GrpcClient;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -23,13 +20,13 @@ import hospital.PatientQuery;
 import hospital.TransformRequest;
 
 /**
- * Adapter de entrada REST do Gateway (D2 walking skeleton). Orquestra a pilha via gRPC:
- * Authorization.Check → (ALLOW) PatientData.Fetch → DataTransform.ToFhir. Só o caminho feliz.
+ * Adapter de entrada REST do Gateway — prontuário individual (médico/estagiário). Orquestra a pilha
+ * via gRPC: Authorization.Check → (ALLOW) PatientData.Fetch → DataTransform.ToFhir. Só o caminho
+ * feliz: erro gRPC ainda vira 500 genérico (o mapeamento gRPC→HTTP global é item de backlog).
+ * A coorte do pesquisador tem rota própria em {@link FhirCohortController}.
  */
 @RestController
 public class FhirPatientController {
-
-    private static final Set<String> KNOWN_ROLES = Set.of("MEDICO", "ESTAGIARIO", "PESQUISADOR");
 
     @GrpcClient("authorization")
     private AuthorizationGrpc.AuthorizationBlockingStub authorizationStub;
@@ -43,7 +40,7 @@ public class FhirPatientController {
     @GetMapping("/fhir/Patient/{id}")
     public ResponseEntity<String> getPatient(@PathVariable String id, @AuthenticationPrincipal Jwt jwt) {
         String username = jwt.getClaimAsString("preferred_username");
-        String role = extractRole(jwt);
+        String role = JwtRoles.extractRole(jwt);
 
         // 1) Autorização.
         AuthzReply authz = authorizationStub.check(AuthzRequest.newBuilder()
@@ -71,19 +68,5 @@ public class FhirPatientController {
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(fhir.getFhirJson());
-    }
-
-    /** Primeira role conhecida em realm_access.roles (o esqueleto só usa MEDICO). */
-    @SuppressWarnings("unchecked")
-    private String extractRole(Jwt jwt) {
-        Object realmAccess = jwt.getClaim("realm_access");
-        if (realmAccess instanceof java.util.Map<?, ?> map && map.get("roles") instanceof List<?> roles) {
-            for (Object r : roles) {
-                if (r instanceof String s && KNOWN_ROLES.contains(s)) {
-                    return s;
-                }
-            }
-        }
-        return "";
     }
 }

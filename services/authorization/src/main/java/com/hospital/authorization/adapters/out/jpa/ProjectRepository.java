@@ -30,11 +30,12 @@ public class ProjectRepository {
      */
     public Optional<ProjectInfo> findDoDono(String usernamePesquisador, String projetoId) {
         List<ProjectInfo> found = jdbc.query(
-                "SELECT status, data_validade FROM projects " +
+                "SELECT status, data_validade, codigo_condicao FROM projects " +
                 "WHERE id_projeto = ? AND username_pesquisador = ?",
                 (rs, rowNum) -> new ProjectInfo(
                         rs.getString("status"),
-                        rs.getObject("data_validade", LocalDate.class)),
+                        rs.getObject("data_validade", LocalDate.class),
+                        rs.getString("codigo_condicao")),
                 projetoId, usernamePesquisador);
         return found.stream().findFirst();
     }

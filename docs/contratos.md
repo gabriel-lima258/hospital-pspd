@@ -49,14 +49,32 @@ A regra vive no domínio puro `AuthorizationPolicy` (testável sem Spring/DB). D
 | `PESQUISADOR` | é dono do projeto **E** `status='Aprovado'` **E** `data_validade >= hoje` | por `tipo_consulta` ↓ |
 | outra / ausente | — | `DENY` |
 
-**`tipo_consulta` → nível do PESQUISADOR** (vocabulário definido aqui; hoje só consumido por chamadas
-gRPC diretas — o gateway ainda não tem rota de coorte):
+**`tipo_consulta` — vocabulário único, atravessa os 3 serviços.** Definido aqui; os três o consomem
+com as **mesmas strings** (`AuthorizationPolicy.nivelPesquisador`, `PatientDataGrpcService.fetch`,
+`FhirTransformer.transform`). Não inventar valores novos.
 
-| `tipo_consulta` | Nível | Uso |
-|---|---|---|
-| `ExamesCoorte` | `ANONYMIZED` | exames por paciente dentro da coorte |
-| `ResumoCoorte`, `Estatisticas` | `AGGREGATED` | estatística/resumo agregado da coorte |
-| _(qualquer outro / vazio)_ | `AGGREGATED` | **default seguro** (nunca ANONYMIZED sem pedido explícito) |
+| `tipo_consulta` | Nível (Authorization) | Patient Data | Saída (Data Transform) |
+|---|---|---|---|
+| `Patient` | `FULL` / `PARTIAL` | prontuário individual | `Bundle` |
+| `ExamesCoorte` | `ANONYMIZED` | amostra de 100 da coorte | `Bundle` pseudonimizado |
+| `ResumoCoorte`, `Estatisticas` | `AGGREGATED` | agregação da coorte | `MeasureReport` |
+| _(qualquer outro / vazio)_ | `AGGREGATED` | — | **default seguro** (nunca ANONYMIZED sem pedido explícito) |
+
+O gateway valida `?tipo=` contra `{ResumoCoorte, Estatisticas, ExamesCoorte}` e devolve **400** fora
+disso, então o default seguro é defesa em profundidade, não caminho normal.
+
+### Resolução da coorte (D3/P3c) — o `coorte_codigo` nasce no servidor
+
+A rota `GET /fhir/cohort/{projetoId}?tipo=…` recebe do cliente **o projeto e o tipo — nunca a coorte**.
+O Authorization, que já lê `projects` para checar dono + status + vigência, devolve
+`AuthzReply.coorte_codigo` (= `projects.codigo_condicao`) e o gateway o repassa **intacto** como
+`PatientQuery.coorte_codigo`. Só é preenchido quando `allow && role == PESQUISADOR`.
+
+> Se a coorte viesse de um parâmetro do cliente, um pesquisador autorizaria em `PRJ01` (Diabetes) e
+> leria a coorte de qualquer outro projeto — bypass da autorização. A rota não expõe esse parâmetro.
+
+Erros da rota de coorte: DENY → **403**; `tipo` inválido/ausente → **400**; coorte vazia → **404**;
+falha gRPC → **502**. Ver `docs/evidencias/pesquisador-coorte.md`.
 
 **Enforcement do nível** (Data Transform, desde o P3b) — o nível **decide a forma da saída**, não anota o dado:
 
@@ -93,7 +111,8 @@ Todos com senha **`senha123`** (não-temporária). Realm `hospital`, `accessToke
 | `pesq.souza` | `PESQUISADOR` | dono de `PRJ01` (Diabetes, Aprovado) |
 | `med.semvinculo` | `MEDICO` | **caso negativo** — sem pacientes vinculados → `DENY` |
 
-> Outro caso negativo (projeto **Expirado**) é dado do seed (D3), não do Keycloak.
+> Os demais casos negativos são dados do seed (D3), não do Keycloak: `PRJ02` (**Expirado** → 403),
+> `PRJ04` (**de outro dono** → 403) e `PRJ03` (Aprovado, mas condição `Rara` sem pacientes → **404**).
 
 ### Obter um JWT — [`keycloak/get-token.sh`](../keycloak/get-token.sh)
 Password grant no client **`hospital-loadtest`** (público, Direct Access Grants). Imprime só o `access_token`:
@@ -117,11 +136,22 @@ p/ o React, `redirectUris`/`webOrigins` = `http://localhost:*`).
 Definido em [`proto/hospital.proto`](../proto/hospital.proto) (`proto3`, `java_multiple_files=true`,
 package `hospital`). Três serviços:
 
-- `Authorization.Check(AuthzRequest) → AuthzReply` — `allow` + `nivel` (FULL/PARTIAL/ANONYMIZED/AGGREGATED).
+- `Authorization.Check(AuthzRequest) → AuthzReply` — `allow` + `nivel` (FULL/PARTIAL/ANONYMIZED/AGGREGATED)
+  + `coorte_codigo` (só em ALLOW + PESQUISADOR).
 - `PatientData.Fetch(PatientQuery) → ClinicalData` — `json_payload` cru.
 - `DataTransform.ToFhir(TransformRequest) → FhirReply` — `fhir_json` (`Bundle` ou `MeasureReport`, conforme o `nivel`).
 
-Stubs Java+gRPC gerados pelo módulo `:proto` (`./gradlew :proto:build`).
+Stubs Java+gRPC gerados pelo módulo `:proto` (`./gradlew :proto:build`). Os 4 serviços embutem esse
+jar ⇒ **toda mudança no proto exige `make redeploy`** (rebuild + `rollout restart` dos 4).
+
+### Log de contratos
+
+Mudanças no proto depois do congelamento do Dia 1. Toda entrada aqui foi **comunicada ao grupo no
+mesmo dia** (regra de ouro nº 2 do `CLAUDE.md`).
+
+| Data | Passo | Mudança | Compatibilidade |
+|---|---|---|---|
+| 2026-07-09 | **D3/P3c** | `AuthzReply` **+** `string coorte_codigo = 3` | **Aditiva.** Campo 3 estava livre; em proto3 o default é `""`. Médico e estagiário ignoram. `AuthzRequest` e `PatientQuery` **não** mudaram. |
 
 ---
 
@@ -129,3 +159,4 @@ Stubs Java+gRPC gerados pelo módulo `:proto` (`./gradlew :proto:build`).
 
 Definido em [`db/schema.sql`](../db/schema.sql): 5 tabelas (`patients`, `encounters`,
 `clinical_events`, `user_patient_assignments`, `projects`) + 5 índices. Ver comentários no arquivo.
+O `schema.sql` **não mudou** desde o Dia 1; o `db/seed.py` ganhou o projeto `PRJ03` (fixture do 404).

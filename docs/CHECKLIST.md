@@ -7,9 +7,10 @@
 > [`docs/Roteiro_PSPD_Observabilidade_K8S.md`](Roteiro_PSPD_Observabilidade_K8S.md) (§3 cronograma,
 > §5 métricas, §7 descobertas, §9 entrega, **Apêndice A** portões 0–7).
 >
-> **Última atualização:** 2026-07-09 · **Fase atual:** **D3 / M2** (validação funcional em andamento —
-> P3a ✅ fonte de dados de coorte · P3b ✅ enforcement por nível + FHIR completo (médico e estagiário
-> fechados ponta-a-ponta); falta o **P3c**: rota REST de coorte do pesquisador).
+> **Última atualização:** 2026-07-09 · **Fase atual:** **D4 / M3** (observabilidade + 1ª bateria de carga).
+> O **M2 fechou**: P3a ✅ fonte de dados de coorte · P3b ✅ enforcement por nível + FHIR completo ·
+> P3c ✅ rota REST de coorte — as **3 jornadas** (médico/FULL, estagiário/PARTIAL, pesquisador/AGG+ANON)
+> validadas ponta-a-ponta no cluster. Daqui em diante a nota vem de **números medidos**.
 
 **Legenda:** ✅ feito · 🟡 parcial · ⬜ a fazer · ➕ bônus (ponto extra) · 🔴 crítico
 **Donos:** cada item pendente começa com o nome do responsável — ver a divisão de trilhas no §0.
@@ -67,8 +68,8 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
 |---|---|---|:--:|---|
 | **D1** | Fundação (contratos, cluster, scaffolds) | **M1a** | ✅ | Cluster 1+3, 3 contratos, Keycloak, 4 scaffolds |
 | **D2** | Esqueleto ambulante ponta a ponta | **M1** 🔴 | ✅ | FHIR real no cluster + métrica no Grafana |
-| **D3** | Engordar serviços + seed em volume | **M2** | 🟡 | Seed ✅ + **decisão** authz ✅; falta **enforcement** |
-| **D4** | Observabilidade + 1ª bateria de carga | **M3** | ⬜ | Dashboards + carga 1 réplica (10→1000 VUs) |
+| **D3** | Engordar serviços + seed em volume | **M2** | ✅ | Seed ✅ + authz ✅ + enforcement ✅ + **3 jornadas REST** ✅ |
+| **D4** | Observabilidade + 1ª bateria de carga | **M3** | ⬜ ← **AQUI** | Dashboards + carga 1 réplica (10→1000 VUs) |
 | **D5** | Escalabilidade horizontal + HPA | **M4** | ⬜ | 3 réplicas + HPA medidos; fix gRPC LB antes |
 | **D6** | Ponto extra + reteste + análise | **M5** | ⬜ ➕ | Tracing OTel+Tempo + todos os cenários |
 | **D7** | Relatório + gráficos + vídeo | **M6** | ⬜ | Entrega no Moodle (zip) |
@@ -77,7 +78,7 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
 
 | Fase | | Status |
 |---|---|:--:|
-| (a) Validação funcional | `████████░░` decisão ok, enforcement pendente | 🟡 |
+| (a) Validação funcional | `██████████` 3 jornadas end-to-end no cluster | ✅ |
 | (b) Testes de carga (10/50/100/500/1000 VUs) | `░░░░░░░░░░` | ⬜ |
 | (c) Escalabilidade horizontal (1→3 réplicas) | `░░░░░░░░░░` | ⬜ |
 | (d) Autoscaling (HPA min1/max10) | `░░░░░░░░░░` | ⬜ |
@@ -111,19 +112,22 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
 - [ ] **Arthur** `make demo` reproduz do zero (**stub** — TODO)
 - 📎 Evidências: `docs/evidencias/{seed-volume-cluster.md, *http_server_requests*.json}`
 
-### 🚦 Portão 3 = M2 — Validação funcional, Fase (a) (D3) 🟡 ← **AQUI**
-- [x] Seed em **volume-alvo** no cluster (Job): patients **50.000**, clinical_events **1.360.406** · `db/seed.py` + `k8s/jobs/seed-job.yaml` + `make seed`
+### 🚦 Portão 3 = M2 — Validação funcional, Fase (a) (D3) ✅
+- [x] Seed em **volume-alvo** no cluster (Job): patients **50.000**, clinical_events **1.387.934** · `db/seed.py` + `k8s/jobs/seed-job.yaml` + `make seed`
 - [x] `SELECT count(*)` bate com o esperado · `docs/evidencias/seed-volume-cluster.md`
 - [x] **Decisão** de autorização completa (MEDICO→FULL, ESTAGIARIO→PARTIAL, PESQUISADOR→ANON/AGG) · `authorization/domain/AuthorizationPolicy` + testes JUnit ✅
 - [x] Negações: médico sem vínculo → DENY; **projeto Expirado → DENY**; dono errado/inexistente → DENY · `docs/evidencias/authz-matriz-completa.md`
 - [x] **(P3a) Fonte de dados de coorte/agregação** em `patient-data` — `Fetch` ramifica por `tipo_consulta`: individual (demográficos + encounters/conditions/observations/medications), `ResumoCoorte`/`Estatisticas` (total, %sexo/faixa/setor, mediaHbA1c, freqMedicamentos) e `ExamesCoorte` (amostra de 100, ainda identificada) · `PatientRepository` + `domain/Percentages` (JUnit ✅) · `docs/evidencias/patient-data-coorte.md`
 - [x] **(P3b) Estagiário vê PARTIAL de verdade** — `name` vira `"J. da S."`, **sem** CPF/CNS, `birthDate: "1980"`; recursos clínicos preservados · `PatientAnonymizer` (37 testes JUnit ✅)
 - [x] **(P3b) Conversão HL7/FHIR completa** — `Bundle` com Patient/Encounter/Condition/Observation/MedicationRequest; AGGREGATED vira `MeasureReport` · `FhirTransformer`, `FhirResourceMapper`
-- [x] **(P3b) Pesquisador vê AGG/ANON de verdade** — ANONYMIZED pseudonimiza (sha256 salgado, estável) e trunca datas ao ano; AGGREGATED devolve `MeasureReport` sem dado individual. Validado via grpcurl (falta só a **rota REST**, no P3c)
-- [ ] **Gabriel** 🟡 **(P3c) Rota REST de coorte no gateway** — resolver `projeto_id` → `codigo_condicao`; exige evoluir o `AuthzReply` (**mudança de contrato**, avisar **Mateus** no mesmo dia) · `FhirPatientController`
-- [ ] **Gabriel** As **3 jornadas** validadas ponta-a-ponta no cluster: médico ✅ e estagiário ✅ pela rota REST; pesquisador só por gRPC direto até o P3c
-- [ ] **Gabriel** Seção "Validação funcional" do relatório escrita com prints → entrega ao **Guilherme**, que consolida
-- 📎 Evidências: `docs/evidencias/{patient-data-coorte.md, data-transform-niveis.md}`
+- [x] **(P3b/P3c) Pesquisador vê AGG/ANON de verdade** — ANONYMIZED pseudonimiza (sha256 salgado, estável) e trunca datas ao ano; AGGREGATED devolve `MeasureReport` sem dado individual. Validado **pela rota REST** no P3c
+- [x] **(P3c) Rota REST de coorte no gateway** — `GET /fhir/cohort/{projetoId}?tipo=…` · `FhirCohortController` + `JwtRoles` · `projeto_id` → `codigo_condicao` resolvido **no Authorization** (`AuthzReply.coorte_codigo`, campo aditivo) · erros 400/403/404/502
+- [x] **(P3c) Coorte vem do servidor, não do cliente** — o `coorte_codigo` só existe no `AuthzReply` do projeto validado; a rota não expõe parâmetro de coorte. `AuthorizationGrpcServiceTest` (4 testes JUnit) prova que DENY e perfil não-pesquisador recebem `""`
+- [x] **(P3c) Fixtures negativos do seed**: `PRJ02` Expirado → 403 · `PRJ04` de outro dono → 403 · `PRJ03` (Aprovado, condição `Rara` sem pacientes) → **404**
+- [x] **As 3 jornadas validadas ponta-a-ponta no cluster** — médico/FULL ✅ · estagiário/PARTIAL ✅ · pesquisador/AGGREGATED+ANONYMIZED ✅, todas pela REST
+- [x] **Mudança de contrato comunicada** — `AuthzReply + coorte_codigo = 3` (aditiva, retrocompatível), registrada no log de [`docs/contratos.md`](contratos.md)
+- [ ] **Guilherme** Seção "Validação funcional" do relatório escrita com prints (insumo pronto em `docs/evidencias/`)
+- 📎 Evidências: `docs/evidencias/{patient-data-coorte.md, data-transform-niveis.md, pesquisador-coorte.md}`
 
 ### 🚦 Portão 4 = M3 — Observabilidade + carga 1 réplica, Fases (e)+(b) (D4) ⬜
 - [ ] **Guilherme** Dashboard Grafana **RED + USE**, **≥5 métricas** ao vivo (JSON versionado + screenshot)
@@ -175,11 +179,11 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
 
 | Componente | Dono | Estado | Veredito | Ponteiro |
 |---|:--:|:--:|---|---|
-| **api-gateway** | **Mateus** | 🟡 | JWT real + cadeia gRPC, mas **só a rota `/fhir/Patient/{id}`**; sem rate-limit/logging/erro gRPC | `FhirPatientController`, `SecurityConfig` |
-| **authorization** | **Mateus** | ✅ | **Completo**: domínio puro + repos + gRPC + testes JUnit | `authorization/domain/*`, `adapters/*` |
+| **api-gateway** | **Mateus** | 🟡 | JWT real + cadeia gRPC + **2 rotas** (prontuário e coorte); falta rate-limit/logging e o erro gRPC→HTTP **global** (a rota de coorte já mapeia 400/403/404/502 localmente) | `FhirPatientController`, `FhirCohortController`, `SecurityConfig` |
+| **authorization** | **Mateus** | ✅ | **Completo**: domínio puro + repos + gRPC + 20 testes JUnit; resolve a coorte do projeto (P3c) | `authorization/domain/*`, `adapters/*` |
 | **patient-data** | **Gabriel** | ✅ | **Completo** (P3a): prontuário individual + agregação de coorte + amostra de exames; testes JUnit | `PatientRepository`, `domain/Percentages` |
 | **data-transform** | **Gabriel** | ✅ | **Completo** (P3b): enforcement por `nivel` + 5 recursos FHIR + `MeasureReport`; 37 testes JUnit | `domain/FhirTransformer`, `domain/PatientAnonymizer` |
-| **db** | **Carlos** | ✅ | schema (5 tabelas+índices), seed volume + seed-min | `db/*` |
+| **db** | **Carlos** | ✅ | schema (5 tabelas+índices), seed volume + seed-min, fixtures negativos (`PRJ02`/`PRJ03`/`PRJ04`) | `db/*` |
 | **keycloak** | **Guilherme** | ✅ | realm + roles + 4 usuários + get-token | `keycloak/*` |
 | **k8s/base** | **Arthur** | ✅ | 6 Deployments/Services, `requests.cpu` setado | `k8s/base/*` |
 | **k8s/observability** | **Guilherme** | 🟡 | só ServiceMonitor; **sem dashboard JSON** | `k8s/observability/servicemonitor.yaml` |
@@ -197,25 +201,23 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
 > Ordem por impacto na nota. ⭐ = **caminho crítico dos 80%** (fases medidas com números).
 > O emoji no início é o **dono** (§0).
 
-1. **Gabriel** · **🔴 (P3c) Fechar o M2 — rota de coorte do pesquisador** _(Portão 3)_
-   - ~~**patient-data agregação/coorte**~~ ✅ **P3a** · ~~**data-transform por `nivel`**~~ ✅ **P3b** · ~~**FHIR completo**~~ ✅ **P3b**
-   - **rota de coorte no gateway**: `projeto_id` → `codigo_condicao` → `PatientQuery.coorte_codigo` · `FhirPatientController`
-   - ⚠️ **Mudança de contrato** a comunicar ao grupo: o `AuthzReply` precisa carregar `coorte_codigo`
-     (o Authorization já lê `projects.codigo_condicao` para decidir; hoje não o devolve).
-   - **DoD:** o pesquisador vê coorte AGG/ANON **pela rota REST**; as 3 jornadas validadas no cluster.
-2. **Arthur** · **⭐🔴 gRPC round_robin** _(Portão 5, mas pré-requisito de qualquer carga com réplicas)_ — Service headless (`clusterIP: None`) + `defaultLoadBalancingPolicy: round_robin` no client. **Bloqueia o item 5 do Carlos.**
+> ~~1. **Gabriel** · (P3c) Fechar o M2 — rota de coorte do pesquisador~~ ✅ **feito** — `AuthzReply.coorte_codigo`
+> + `FhirCohortController`; as 3 jornadas validadas no cluster (`docs/evidencias/pesquisador-coorte.md`).
+> **O caminho crítico agora é a fase (b): carga.**
+
+1. **Arthur** · **⭐🔴 gRPC round_robin** _(Portão 5, mas pré-requisito de qualquer carga com réplicas)_ — Service headless (`clusterIP: None`) + `defaultLoadBalancingPolicy: round_robin` no client. **Bloqueia o item 4 do Carlos.**
+2. **Carlos** · **⭐🔴 loadtest + `make load`** _(Portão 4)_ — `scenario.js`, `run-load-tests.sh`, pool `tokens.json`, `collect-metrics.sh`; rodar `1replica`. **Agora destravado** (as 3 rotas do cenário existem).
 3. **Arthur** · **⭐ HPA** _(Portão 5)_ — `k8s/base/hpa.yaml` (autoscaling/v2, min1/max10, CPU 60%).
-4. **Carlos** · **⭐ loadtest + `make load`** _(Portão 4)_ — `scenario.js`, `run-load-tests.sh`, pool `tokens.json`, `collect-metrics.sh`; rodar `1replica`.
-5. **Carlos** · **⭐ 3replicas + HPA medidos** _(Portão 5)_ — as duas baterias restantes. **Depende do item 2 (Arthur).**
-6. **Guilherme** · **⭐ Dashboards RED/USE** _(Portão 4)_ — JSON versionado + ≥5 métricas + screenshots.
-7. **Carlos** · **⭐ `plot.py` + CSVs → PNGs** _(Portão 6)_ — gráficos comparativos.
-8. **Guilherme** · **➕ Tracing (OTel + Tempo)** _(Portão 6)_ — melhor ROI de bônus.
-8b. **Mateus** · **Gateway maduro** _(Portão 4)_ — rate limiting + logging estruturado + erro gRPC→HTTP (hoje um `onError` vira 500 genérico); readiness que checa o DB.
+4. **Carlos** · **⭐ 3replicas + HPA medidos** _(Portão 5)_ — as duas baterias restantes. **Depende do item 1 (Arthur).**
+5. **Guilherme** · **⭐ Dashboards RED/USE** _(Portão 4)_ — JSON versionado + ≥5 métricas + screenshots.
+6. **Carlos** · **⭐ `plot.py` + CSVs → PNGs** _(Portão 6)_ — gráficos comparativos.
+7. **Guilherme** · **➕ Tracing (OTel + Tempo)** _(Portão 6)_ — melhor ROI de bônus.
+8. **Mateus** · **Gateway maduro** _(Portão 4)_ — rate limiting + logging estruturado + erro gRPC→HTTP **global** via `@ControllerAdvice` (hoje `/fhir/Patient/{id}` ainda transforma qualquer `onError` em 500: paciente inexistente devolve 500, não 404; o `INVALID_ARGUMENT` do data-transform vira 500, não 400). A rota de coorte já faz isso localmente — usar como referência e **não** regredir os 400/403/404/502 dela; readiness que checa o DB.
 9. **Guilherme** · **frontend mínimo** _(§9.1 / §9.7 · Portão 3+7)_ — **obrigatório, mas mínimo e P2** (baixo valor isolado; **primeiro a cortar** sob pressão — ordem de corte §R9: frontend rico → FHIR 100% → cenários extras).
    - **Objetivo:** 1 SPA enxuta que autentica via **OAuth2/OIDC no Keycloak** (client `hospital-frontend`, Standard Flow) e faz as **3 consultas** (médico→FULL, estagiário→PARTIAL, pesquisador→coorte), renderizando conforme o nível retornado.
    - **Arquivos-alvo:** `frontend/` (hoje só `.gitkeep`) · client `hospital-frontend` já existe no `keycloak/realm-export.json` (`redirectUris`/`webOrigins` = `http://localhost:*`).
    - **DoD:** loga com `med.cardoso`/`est.almeida`/`pesq.souza`, envia `Authorization: Bearer` ao gateway, mostra as 3 respostas (inclusive um DENY→403). Serve principalmente ao **vídeo/demo (D7)**, não aos pontos técnicos.
-   - **Depende de:** fechar o M2 (para as respostas por nível terem sentido) e, para o pesquisador, das rotas de coorte no gateway (ainda inexistentes).
+   - **Destravado:** o M2 fechou. As 3 rotas existem: `GET /fhir/Patient/{id}` (médico/estagiário) e `GET /fhir/cohort/{projetoId}?tipo=ResumoCoorte|ExamesCoorte` (pesquisador).
 10. **Arthur** · **`make demo`** _(Portão 2/7)_ — reprodução ponta-a-ponta.
 11. **Guilherme** · **Relatório §9 + vídeo** _(Portão 7)_ — escrever incrementalmente, não deixar p/ o fim. Cada trilha entrega a sua seção; **o Guilherme consolida** e entrega.
 
@@ -246,6 +248,8 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
 - **ANONYMIZED trunca datas clínicas ao ano** — decisão deliberada: a sequência exata de timestamps de exames é quasi-identificador. Custo: perde-se análise longitudinal fina.
 - **`freqMedicamentos` conta prescrições, não pacientes** — escolha deliberada p/ a soma fechar 100% (por paciente somaria 225%: um diabético usa vários fármacos). Documentado em `docs/evidencias/patient-data-coorte.md`.
 - **Sem índice em `clinical_events(tipo_evento)`** — a agregação de medicamentos faz Seq Scan (~425 ms em 1,36M linhas). É **insumo do §7.1**, não bug: `schema.sql` é contrato congelado. Mitigação (`ix_events_pac_tipo`) documentada, não aplicada.
+- **`JwtRoles.extractRole` pega a *primeira* role conhecida** 🟡 — a ordem de `realm_access.roles` não é garantida, então um usuário com duas roles do domínio (ex.: MEDICO + PESQUISADOR) pode ser roteado pela errada. **Não é escalonamento** (o ALLOW ainda exige vínculo ou projeto), mas é arbitrário. Fix natural: escolher a role pelo tipo de rota, ou rejeitar tokens multi-role.
+- **Erro gRPC→HTTP só na rota de coorte** 🟡 — `FhirCohortController` mapeia 400/403/404/502; `/fhir/Patient/{id}` ainda devolve 500 genérico. Fecha no item 8 do backlog (**Mateus**).
 - **gRPC pin em 1 pod** — até o `round_robin`, testes com réplicas não mostram escala.
 - **PNG do Grafana manual** — automação de browser não alcança o port-forward local; capturar à mão.
 - **`make demo` / `rebuild`** — pendentes (stub / `.PHONY` sem corpo).
@@ -271,6 +275,7 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
 | | Dashboard-radiador (RED dos 4) | ⬜ ➕ | em cima dos dashboards obrigatórios |
 | | postgres-exporter · reflexão cap.15–16 | ⬜ ➕ | reflexão é **exigida** pela spec e ainda conta extra |
 
-**Garantido hoje:** fundação sólida (M1a/M1), integração ponta-a-ponta, volume real, decisão de acesso
-correta e testada. **Em risco (foco agora):** os **80%** dependem de fechar o M2 e rodar as fases b–e —
-é para onde todo o esforço deve ir.
+**Garantido hoje:** fundação sólida (M1a/M1), **M2 fechado** — integração ponta-a-ponta, volume real,
+decisão de acesso correta e testada, e o *enforcement* dela nas 3 jornadas REST.
+**Em risco (foco agora):** os **80%** dependem inteiramente das fases **b–e** (carga, escala, HPA,
+observabilidade). Nenhum número medido existe ainda — é para onde todo o esforço deve ir.

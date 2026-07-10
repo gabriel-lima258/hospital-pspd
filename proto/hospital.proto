@@ -18,6 +18,11 @@ message AuthzRequest {
 message AuthzReply {
   bool   allow = 1;
   string nivel = 2;          // FULL | PARTIAL | ANONYMIZED | AGGREGATED
+  // Condição da coorte do projeto validado (ex.: Diabetes). Só vem preenchido em
+  // ALLOW + PESQUISADOR. O Gateway repassa este valor — e nunca um parâmetro do
+  // cliente — como PatientQuery.coorte_codigo; caso contrário, autorizar num projeto
+  // permitiria ler a coorte de outro. Campo aditivo (D3/P3c): default "" p/ os demais perfis.
+  string coorte_codigo = 3;
 }
 service Authorization {
   rpc Check(AuthzRequest) returns (AuthzReply);

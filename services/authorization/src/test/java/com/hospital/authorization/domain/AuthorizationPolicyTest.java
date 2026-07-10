@@ -30,6 +30,11 @@ class AuthorizationPolicyTest {
         return new AuthzInput("PESQUISADOR", tipoConsulta, false, false, projeto, HOJE);
     }
 
+    /** A policy não lê o codigo_condicao (quem o devolve é o adapter gRPC); fixa-o para não poluir. */
+    private static ProjectInfo projeto(String status, LocalDate validade) {
+        return new ProjectInfo(status, validade, "Diabetes");
+    }
+
     @Nested
     @DisplayName("MEDICO → FULL sse vínculo médico ativo")
     class Medico {
@@ -65,7 +70,7 @@ class AuthorizationPolicyTest {
     @Nested
     @DisplayName("PESQUISADOR → ALLOW sse projeto Aprovado E vigente; nível por tipo_consulta")
     class Pesquisador {
-        private final ProjectInfo aprovadoVigente = new ProjectInfo("Aprovado", HOJE.plusDays(30));
+        private final ProjectInfo aprovadoVigente = projeto("Aprovado", HOJE.plusDays(30));
 
         @Test
         void examesCoorte_allowAnonymized() {
@@ -97,21 +102,21 @@ class AuthorizationPolicyTest {
         @Test
         @DisplayName("Aprovado MAS vencido (data_validade < hoje) → DENY")
         void aprovadoMasVencido_deny() {
-            ProjectInfo vencido = new ProjectInfo("Aprovado", HOJE.minusDays(1));
+            ProjectInfo vencido = projeto("Aprovado", HOJE.minusDays(1));
             assertThat(policy.decide(pesquisador("ResumoCoorte", vencido))).isEqualTo(Decision.DENY);
         }
 
         @Test
         @DisplayName("Expirado MAS ainda na validade → DENY (status manda)")
         void expiradoMasNaValidade_deny() {
-            ProjectInfo expirado = new ProjectInfo("Expirado", HOJE.plusDays(365));
+            ProjectInfo expirado = projeto("Expirado", HOJE.plusDays(365));
             assertThat(policy.decide(pesquisador("ResumoCoorte", expirado))).isEqualTo(Decision.DENY);
         }
 
         @Test
         @DisplayName("Suspenso → DENY")
         void suspenso_deny() {
-            ProjectInfo suspenso = new ProjectInfo("Suspenso", HOJE.plusDays(30));
+            ProjectInfo suspenso = projeto("Suspenso", HOJE.plusDays(30));
             assertThat(policy.decide(pesquisador("ResumoCoorte", suspenso))).isEqualTo(Decision.DENY);
         }
 
@@ -124,7 +129,7 @@ class AuthorizationPolicyTest {
         @Test
         @DisplayName("vigência é inclusiva: data_validade == hoje → ALLOW")
         void validadeIgualHoje_allow() {
-            ProjectInfo hojeExato = new ProjectInfo("Aprovado", HOJE);
+            ProjectInfo hojeExato = projeto("Aprovado", HOJE);
             assertThat(policy.decide(pesquisador("ResumoCoorte", hojeExato)).allow()).isTrue();
         }
     }

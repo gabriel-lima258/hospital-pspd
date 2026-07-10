@@ -137,21 +137,40 @@ falam entre si pela rede do compose (gRPC em `:9090`, HTTP/actuator em `:8080`).
 
 
 
-### Requisição de exemplo (esqueleto ambulante, M1)
+### As 3 jornadas (M2)
 
-`GET /fhir/Patient/{id}` atravessa Gateway → Authorization → Patient Data → Postgres → Data Transform:
+Toda requisição atravessa Gateway → Authorization → Patient Data → Postgres → Data Transform.
+O **nível autorizado decide a forma da saída** — não é anotação, é enforcement.
+
+**1 e 2 — prontuário individual** (`GET /fhir/Patient/{id}`):
 
 ```bash
 TOKEN=$(keycloak/get-token.sh med.cardoso)
 curl -H "Authorization: Bearer $TOKEN" http://localhost:9000/fhir/Patient/P000001 | jq
 # → Bundle FHIR (Patient + Encounter/Condition/Observation/MedicationRequest), mascarado pelo nível:
-#   MEDICO (FULL)     → {"resourceType":"Patient","id":"P000001","name":[{"text":"Joao da Silva"}],"identifier":[CPF,CNS],...}
-#   ESTAGIARIO (PARTIAL) → {"resourceType":"Patient","name":[{"text":"J. da S."}],"birthDate":"1980"}  (sem CPF/CNS)
+#   MEDICO (FULL)        → name:"Joao da Silva", birthDate:"1980-05-12", identifier:[CPF, CNS]
+#   ESTAGIARIO (PARTIAL) → name:"J. da S.",      birthDate:"1980",       sem identifier
 
 # Caso negativo (médico sem vínculo) → HTTP 403:
 TOKEN=$(keycloak/get-token.sh med.semvinculo)
 curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $TOKEN" \
   http://localhost:9000/fhir/Patient/P000001
+```
+
+**3 — coorte de pesquisa** (`GET /fhir/cohort/{projetoId}?tipo=…`). O cliente escolhe o **projeto**;
+a **coorte** é resolvida pelo Authorization a partir do projeto validado, nunca por parâmetro:
+
+```bash
+TOKEN=$(keycloak/get-token.sh pesq.souza)
+curl -H "Authorization: Bearer $TOKEN" \
+  'http://localhost:9000/fhir/cohort/PRJ01?tipo=ResumoCoorte' | jq
+# → MeasureReport (AGGREGATED): total 8952, %sexo/faixa/setor, mediaHbA1c — zero dado individual
+
+curl -H "Authorization: Bearer $TOKEN" \
+  'http://localhost:9000/fhir/cohort/PRJ01?tipo=ExamesCoorte' | jq
+# → Bundle (ANONYMIZED): Patients pseudonimizados ("hash…"), datas truncadas ao ano
+
+# PRJ02 (Expirado) e PRJ04 (de outro dono) → 403 · PRJ03 (coorte vazia) → 404 · tipo inválido → 400
 ```
 
 

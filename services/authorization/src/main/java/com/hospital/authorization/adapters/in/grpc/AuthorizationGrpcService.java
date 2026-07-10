@@ -21,9 +21,9 @@ import net.devh.boot.grpc.server.service.GrpcService;
  * {@link AuthzInput} e delegar a DECISÃO ao domínio ({@link AuthorizationPolicy}). Nenhuma regra de
  * negócio vive aqui nem nos repositórios.
  *
- * DÍVIDA TÉCNICA (P3): a decisão PARTIAL/ANONYMIZED/AGGREGATED é correta, mas a ENFORCEMENT (a
- * anonimização/agregação real dos dados) ainda não existe — hoje o Data Transform devolve dados FULL
- * independentemente do nível. Ex.: um ESTAGIARIO recebe ALLOW/PARTIAL e vê dados completos. Fechar no P3.
+ * <p>Desde o P3c a reply também carrega o {@code coorte_codigo} do projeto validado — o Gateway
+ * precisa dele para consultar o Patient Data, e resolvê-lo aqui (a partir do projeto cuja ownership
+ * e vigência já foram checadas) é o que impede o cliente de escolher a coorte que quiser.
  */
 @GrpcService
 public class AuthorizationGrpcService extends AuthorizationGrpc.AuthorizationImplBase {
@@ -58,8 +58,21 @@ public class AuthorizationGrpcService extends AuthorizationGrpc.AuthorizationImp
         AuthzReply reply = AuthzReply.newBuilder()
                 .setAllow(d.allow())
                 .setNivel(d.allow() ? d.nivel().name() : "")
+                .setCoorteCodigo(coorteCodigoDaReply(d.allow(), role, projeto))
                 .build();
         responseObserver.onNext(reply);
         responseObserver.onCompleted();
+    }
+
+    /**
+     * A coorte só sai daqui para o dono de um projeto efetivamente autorizado. Um DENY, ou um perfil
+     * que não é PESQUISADOR, recebe "" — assim nem um bug no Gateway consegue transformar uma negação
+     * numa consulta de coorte. Função pura (package-private) para ser testável sem Spring nem DB.
+     */
+    static String coorteCodigoDaReply(boolean allow, String role, ProjectInfo projeto) {
+        if (allow && "PESQUISADOR".equals(role) && projeto != null && projeto.codigoCondicao() != null) {
+            return projeto.codigoCondicao();
+        }
+        return "";
     }
 }
