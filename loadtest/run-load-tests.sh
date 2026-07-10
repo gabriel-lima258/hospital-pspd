@@ -35,6 +35,12 @@ case "$SCENARIO" in
   *) echo "cenário inválido: $SCENARIO" >&2; exit 2 ;;
 esac
 
+# Rate limiting OFF durante a medição: o pool tem só 3 usuários; um limite por-usuário mediria o
+# limitador, não a aplicação. Reseta no próximo `make deploy`. (Demonstração do 429 é separada.)
+echo ">>> desligando rate limiting para a medição (GATEWAY_RATELIMIT_ENABLED=false)"
+kubectl set env deploy/api-gateway GATEWAY_RATELIMIT_ENABLED=false >/dev/null
+kubectl rollout status deploy/api-gateway --timeout=120s >/dev/null
+
 # ── 2. Port-forwards efêmeros (Keycloak p/ tokens, gateway p/ k6) ─────────────
 PF_PIDS=()
 cleanup() { for p in "${PF_PIDS[@]:-}"; do kill "$p" 2>/dev/null || true; done; }

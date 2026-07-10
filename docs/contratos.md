@@ -83,6 +83,13 @@ próprio `try/catch`.)
 `UNAUTHENTICATED`→**401**, `UNAVAILABLE`→**503**, `DEADLINE_EXCEEDED`→**504**, resto→**502**. Em
 particular, **paciente inexistente** → Patient Data sinaliza `NOT_FOUND` → **404** (antes: 500).
 
+**Rate limiting** (`RateLimitFilter`) — token bucket por usuário (chave = subject do JWT), aplicado
+após a autenticação a todas as rotas exceto `/actuator/**`. Estourou → **429** com header
+`Retry-After` (segundos) e corpo `{"error":"rate_limited","retry_after_ms":N}`. Parâmetros em
+`gateway.ratelimit` (`enabled`/`capacity`/`refill-per-second`); `enabled=false` via
+`GATEWAY_RATELIMIT_ENABLED` desliga (usado na bateria k6). Estado por instância → com N réplicas o
+teto efetivo é N× o configurado.
+
 **Enforcement do nível** (Data Transform, desde o P3b) — o nível **decide a forma da saída**, não anota o dado:
 
 | Nível | Saída | Mantém | Remove |

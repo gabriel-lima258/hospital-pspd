@@ -47,6 +47,15 @@ management:
       percentiles-histogram:
         http.server.requests: true
 
+# Rate limiting por usuário (exigência do enunciado). Token bucket em memória por instância.
+# `enabled` é toggle de runtime: a bateria k6 (pool de 3 usuários) DESLIGA via
+# GATEWAY_RATELIMIT_ENABLED=false para não medir o limitador em vez da aplicação (ver loadtest/).
+gateway:
+  ratelimit:
+    enabled: ${GATEWAY_RATELIMIT_ENABLED:true}
+    capacity: ${GATEWAY_RATELIMIT_CAPACITY:50}
+    refill-per-second: ${GATEWAY_RATELIMIT_REFILL:25}
+
 # Único serviço publicado (REST/HTTP).
 server:
   port: 9000

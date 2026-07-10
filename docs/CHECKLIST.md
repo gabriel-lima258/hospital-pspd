@@ -136,7 +136,7 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
 
 ### 🚦 Portão 4 = M3 — Observabilidade + carga 1 réplica, Fases (e)+(b) (D4) ⬜
 - [ ] **Guilherme** Dashboard Grafana **RED + USE**, **≥5 métricas** ao vivo (JSON versionado + screenshot)
-- [ ] **Mateus** **Rate limiting** no Gateway (exigido pelo enunciado; hoje inexistente) · `api-gateway`
+- [x] **Rate limiting** no Gateway (exigido pelo enunciado) — filtro token-bucket por usuário após a autenticação, 429 + `Retry-After`; toggle `GATEWAY_RATELIMIT_ENABLED` (a carga desliga p/ não medir o limitador). 5 testes JUnit ✅ · `ratelimit/{TokenBucket,RateLimitFilter,RateLimitProperties}`. **Validado E2E** 2026-07-10: rajada `-P20` → 72×200 + 128×429 · `docs/evidencias/rate-limit-429.md`. _Arthur adiantou (Trilha B)._
 - [ ] **Mateus** **Logging estruturado** (JSON) com `username`/`role`/`nivel`/`patient_id` — alimenta a auditoria e o tracing ➕
 - [x] **Erro gRPC→HTTP**: `GrpcHttpExceptionHandler` (@RestControllerAdvice) mapeia por código — `NOT_FOUND`→404, `INVALID_ARGUMENT`→400, `PERMISSION_DENIED`→403, `UNAVAILABLE`→503, resto→502. Patient Data sinaliza `NOT_FOUND` p/ paciente inexistente (era 500). 7 testes JUnit ✅. _Arthur adiantou (Trilha B)._ **Falta validar E2E** (`curl` paciente inexistente → 404)
 - [ ] **Mateus** Probes _dependency-aware_ (readiness checa o DB)
@@ -263,7 +263,7 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
 - **`freqMedicamentos` conta prescrições, não pacientes** — escolha deliberada p/ a soma fechar 100% (por paciente somaria 225%: um diabético usa vários fármacos). Documentado em `docs/evidencias/patient-data-coorte.md`.
 - **Sem índice em `clinical_events(tipo_evento)`** — a agregação de medicamentos faz Seq Scan (~425 ms em 1,36M linhas). É **insumo do §7.1**, não bug: `schema.sql` é contrato congelado. Mitigação (`ix_events_pac_tipo`) documentada, não aplicada.
 - **`JwtRoles.extractRole` pega a *primeira* role conhecida** 🟡 — a ordem de `realm_access.roles` não é garantida, então um usuário com duas roles do domínio (ex.: MEDICO + PESQUISADOR) pode ser roteado pela errada. **Não é escalonamento** (o ALLOW ainda exige vínculo ou projeto), mas é arbitrário. Fix natural: escolher a role pelo tipo de rota, ou rejeitar tokens multi-role.
-- **Erro gRPC→HTTP só na rota de coorte** 🟡 — `FhirCohortController` mapeia 400/403/404/502; `/fhir/Patient/{id}` ainda devolve 500 genérico. Fecha no item 8 do backlog (**Mateus**).
+- ~~**Erro gRPC→HTTP só na rota de coorte**~~ ✅ **resolvido** — `GrpcHttpExceptionHandler` (@RestControllerAdvice) cobre `/fhir/Patient/{id}`: paciente inexistente → 404 (era 500 genérico). 7 testes JUnit. Falta só validar E2E (`curl` P inexistente → 404).
 - ~~**gRPC pin em 1 pod**~~ ✅ **resolvido** — Service headless (`k8s/base/grpc-headless.yaml`) é o default; `make grpc-lb-off` reproduz o arranjo antigo de propósito, para o "antes" do §7.3.
 - ~~**`make demo` / `rebuild`**~~ ✅ **implementados**. `make demo DEMO_FRESH=1` ainda **não foi rodado ponta-a-ponta** — validar antes do D7.
 - **PNG do Grafana manual** — automação de browser não alcança o port-forward local; capturar à mão.

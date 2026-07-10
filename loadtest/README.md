@@ -31,6 +31,10 @@ make plot                          # CSV mestre + PNGs em docs/evidencias/
 Cada `make load` roda os 5 níveis (10/50/100/500/1000 VUs), 3 min cada, com warm-up + cool-down
 fixos (condições idênticas). Summaries → `loadtest/out/<cenario>_vus<n>.json`.
 
+> `run-load-tests.sh` desliga o **rate limiting** (`GATEWAY_RATELIMIT_ENABLED=false`) antes da
+> bateria — o pool tem só 3 usuários e um limite por-usuário mediria o limitador, não a app. Reseta
+> no próximo `make deploy`. A evidência do 429 é capturada à parte (burst num único usuário).
+
 **Fase (d) — série temporal:** rode em outro terminal, ANTES da bateria `hpa`:
 ```bash
 make watch-hpa SCENARIO=hpa        # → docs/evidencias/hpa-timeline.csv
