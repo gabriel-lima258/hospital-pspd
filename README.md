@@ -210,7 +210,7 @@ Detalhes dos claims em `[docs/contratos.md](docs/contratos.md)`. Para recriar o 
 | `make seed`                                 | Semeia o **cluster** via Job k8s (`SCALE=50000`, `seed=42`, `COPY`) — ~50k pacientes, ~1–2M eventos | ✅        |
 | `make seed-local`                           | Semeia o banco do **compose** (`localhost:5433`) via venv Python. `SCALE=` ajusta o volume     | ✅        |
 | `make deploy`                               | Build das imagens + `kind load` + aplica `k8s/`                                                 | 🚧 D2/D5 |
-| `make load SCENARIO=1replica|3replicas|hpa` | Bateria k6 (10/50/100/500/1000 VUs)                                                             | 🚧 D4/D5 |
+| `make load SCENARIO=1replica|3replicas|hpa` | Bateria k6 (10/50/100/500/1000 VUs) + geração de CSV/plots                                    | ✅ D4/D5 |
 | `make demo`                                 | Reproduz o esqueleto ambulante do zero                                                          | 🚧 D2    |
 | `make help`                                 | Lista os alvos                                                                                  | ✅        |
 

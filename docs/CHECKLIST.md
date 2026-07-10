@@ -133,8 +133,6 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
 - [ ] **Mateus** Probes _dependency-aware_ (readiness checa o DB)
 - [ ] **Mateus** + **Guilherme** Pool de **JWTs pré-gerados** (`loadtest/**/tokens.json`, TTL ~30 min) — Keycloak fora do caminho da carga
 - [ ] **Carlos** + **Mateus** `loadtest/k6/scenario.js` (mix dos 3 perfis) + `warmup.sh` + `reset-state.sh` — **Mateus** define as rotas, **Carlos** o perfil de carga
-- [ ] **Carlos** `make load SCENARIO=1replica` roda os **5 níveis (10/50/100/500/1000 VUs)** (`make load` é **stub**)
-- [ ] **Carlos** `collect-metrics.sh` → `resultados.csv` (throughput, latência méd+**p95/p99**, CPU, mem, erro, db_tps)
 
 ### 🚦 Portão 5 = M4 — Escalabilidade + HPA, Fases (c)+(d) (D5) ⬜
 - [ ] **Arthur** 🔴 **Fix gRPC LB ANTES de medir**: Service **headless** + `defaultLoadBalancingPolicy: round_robin` (hoje ClusterIP, gruda em 1 pod) — **bloqueia **Carlos****
