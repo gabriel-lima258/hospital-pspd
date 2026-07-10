@@ -58,8 +58,8 @@ autorizado decide a forma da saída, não é anotação. Ver [`docs/contratos.md
 Java 21 · Spring Boot (hexagonal) · **Gradle** (wrapper `./gradlew`) · gRPC
 (`net.devh:grpc-spring-boot-starter`) · Spring Data JPA · Spring Security OAuth2 (só no Gateway) ·
 Micrometer + Actuator (`/actuator/prometheus`) · **Keycloak** (OAuth2/OIDC) · **PostgreSQL 16**.
-Cluster: **kind** · Observabilidade: **Prometheus + Grafana** · Carga: **k6** · Tracing (extra):
-OpenTelemetry + Tempo.
+Cluster: **kind** · Observabilidade: **Prometheus + Grafana** · Logs agregados (extra): **Loki +
+Promtail** (`make loki`) · Carga: **k6** · Tracing (extra): OpenTelemetry + Tempo.
 
 ---
 
@@ -225,6 +225,7 @@ Detalhes dos claims em `[docs/contratos.md](docs/contratos.md)`. Para recriar o 
 | `make cluster`                              | Cria kind (1 control-plane + 3 workers) + metrics-server + kube-prometheus-stack                | ✅        |
 | `make cluster-down`                         | Deleta o cluster kind (`pspd`)                                                                  | ✅        |
 | `make grafana`                              | Port-forward do Grafana em [http://localhost:3000](http://localhost:3000) (imprime user admin + senha do secret) | ✅        |
+| `make loki`                                 | **(bônus)** Loki + Promtail: agrega os logs JSON no Grafana; LogQL `\| json \| nivel="FULL"`    | ✅        |
 | `make seed`                                 | Semeia o **cluster** via Job k8s (`SCALE=50000`, `seed=42`, `COPY`) — ~50k pacientes, ~1–2M eventos | ✅        |
 | `make seed-local`                           | Semeia o banco do **compose** (`localhost:5433`) via venv Python. `SCALE=` ajusta o volume     | ✅        |
 | `make deploy`                               | Build das imagens + `kind load` + aplica `k8s/base` e `k8s/observability` (**não** o HPA)        | ✅        |
@@ -296,8 +297,11 @@ Gradle:
   testada e as **3 jornadas REST** (médico/FULL, estagiário/PARTIAL, pesquisador/AGGREGATED+ANONYMIZED).
 - ✅ **Infra de escala** — Service headless + `round_robin`, HPA (min 1 / max 10 / CPU 60%), toggles
   no `Makefile`. Falta **medir**.
+- ✅ **Gateway maduro** — rate limiting por usuário (429), logging estruturado JSON (auditoria),
+  erro gRPC→HTTP global (404/400/…). Harness k6 (`make load`/`make plot`) pronto.
+- ✅ **Logs agregados (bônus)** — Loki + Promtail (`make loki`); LogQL no Grafana sobre o JSON.
 - 🚧 **M3/M4** — dashboards RED/USE, baterias k6 (10/50/100/500/1000 VUs), escalabilidade e HPA.
-  Nenhum número medido ainda: é onde estão os **80% da nota**.
+  Falta **medir** (rodar o k6) e o dashboard: é onde estão os **80% da nota**.
 
 Placar completo, donos por trilha e portões: **`[docs/CHECKLIST.md](docs/CHECKLIST.md)`**. Detalhe
 técnico: [roteiro](docs/Roteiro_PSPD_Observabilidade_K8S.md).

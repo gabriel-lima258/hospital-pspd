@@ -155,6 +155,7 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
 - [ ] **Carlos** **Limite de escalabilidade** identificado (satura no Postgres) + impacto no banco documentado (USE)
 
 ### 🚦 Portão 6 = M5 — Ponto extra + reteste + análise (D6) ⬜ ➕
+- [x] ➕ **Loki + Promtail** (`make loki`) — Promtail (DaemonSet) coleta o stdout dos pods → Loki → datasource auto-registrado no Grafana do kps (`k8s/observability/loki-datasource.yaml`). Empilha no logging JSON: LogQL `{namespace="default"} | json | nivel="FULL"`. _Arthur adiantou._ **Falta screenshot** (Grafana Explore) → `docs/evidencias/`
 - [ ] **Guilherme** ➕ Tracing distribuído: OTel Java agent nos 4 serviços + **Tempo** (trace multi-serviço)
 - [ ] **Guilherme** ➕ `postgres-exporter` (métricas do banco no Prometheus)
 - [ ] **Carlos** Todos os cenários (1replica/3replicas/hpa) coletados sob condições idênticas (§4.9)
@@ -221,7 +222,7 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
 4. **Guilherme** · **⭐ Dashboards RED/USE** _(Portão 4)_ — JSON versionado + ≥5 métricas + screenshots.
 5. **Carlos** · **⭐ `plot.py` + CSVs → PNGs** _(Portão 6)_ — gráficos comparativos.
 6. **Guilherme** · **➕ Tracing (OTel + Tempo)** _(Portão 6)_ — melhor ROI de bônus.
-7. **Mateus** · **Gateway maduro** _(Portão 4)_ — rate limiting + logging estruturado + erro gRPC→HTTP **global** via `@ControllerAdvice` (hoje `/fhir/Patient/{id}` ainda transforma qualquer `onError` em 500: paciente inexistente devolve 500, não 404; o `INVALID_ARGUMENT` do data-transform vira 500, não 400). A rota de coorte já faz isso localmente — usar como referência e **não** regredir os 400/403/404/502 dela; readiness que checa o DB.
+7. **Gateway maduro** _(Portão 4)_ — ✅ rate limiting, ✅ logging estruturado JSON, ✅ erro gRPC→HTTP global (`GrpcHttpExceptionHandler`: paciente inexistente → 404) já feitos (Arthur adiantou; ver itens do Portão 4). **Resta só (Mateus):** readiness _dependency-aware_ que checa o DB.
 8. **Guilherme** · **frontend mínimo** _(§9.1 / §9.7 · Portão 3+7)_ — **obrigatório, mas mínimo e P2** (baixo valor isolado; **primeiro a cortar** sob pressão — ordem de corte §R9: frontend rico → FHIR 100% → cenários extras).
    - **Objetivo:** 1 SPA enxuta que autentica via **OAuth2/OIDC no Keycloak** (client `hospital-frontend`, Standard Flow) e faz as **3 consultas** (médico→FULL, estagiário→PARTIAL, pesquisador→coorte), renderizando conforme o nível retornado.
    - **Arquivos-alvo:** `frontend/` (hoje só `.gitkeep`) · client `hospital-frontend` já existe no `keycloak/realm-export.json` (`redirectUris`/`webOrigins` = `http://localhost:*`).

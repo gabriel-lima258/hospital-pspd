@@ -1,6 +1,6 @@
 # Makefile — Hospital Universitário (PSPD/UnB). Tudo que repete vira alvo (regra de ouro 4).
 .PHONY: up rebuild down logs cluster cluster-down grafana check-cluster-tools images deploy redeploy \
-        seed seed-local grpc-lb-on grpc-lb-off hpa-on hpa-off scale pods-wide watch-hpa load plot demo help
+        seed seed-local grpc-lb-on grpc-lb-off hpa-on hpa-off scale pods-wide watch-hpa load plot loki demo help
 
 # Nome do cluster kind (usado por cluster / cluster-down / deploy futuro).
 KIND_CLUSTER ?= pspd
@@ -14,6 +14,7 @@ help:
 	@echo "  make cluster     - cria kind 1+3 + metrics-server + kube-prometheus-stack [D1 ✓]"
 	@echo "  make cluster-down - deleta o cluster kind ($(KIND_CLUSTER))"
 	@echo "  make grafana     - port-forward do Grafana em http://localhost:3000 (admin + senha do secret)"
+	@echo "  make loki        - Loki + Promtail (bônus): agrega logs JSON no Grafana (LogQL)"
 	@echo "  make deploy      - build+kind load das imagens + aplica k8s/base + k8s/observability [D2 ✓]"
 	@echo "  make redeploy    - rebuild + kind load + rollout restart dos 4 serviços [D2 ✓]"
 	@echo "  make seed        - semeia o banco no CLUSTER via Job (SCALE=$(SCALE), seed=42) [D3 ✓]"
@@ -86,6 +87,22 @@ grafana:
 	@echo "Grafana: http://localhost:3000  (usuário: admin)"
 	@echo -n "senha: "; kubectl -n monitoring get secret kps-grafana -o jsonpath='{.data.admin-password}' | base64 -d; echo
 	kubectl port-forward -n monitoring svc/kps-grafana 3000:80
+
+# Loki + Promtail (bônus, §6 observabilidade): agrega os logs JSON de todos os pods e os expõe no
+# Grafana do kps como datasource. Promtail (DaemonSet) coleta o stdout dos pods → Loki → LogQL.
+# Rodar DEPOIS de `make cluster` (usa a namespace monitoring do kps).
+loki: check-cluster-tools
+	@echo ">> registrando repositório Helm grafana"
+	helm repo add grafana https://grafana.github.io/helm-charts --force-update
+	helm repo update
+	@echo ">> instalando loki-stack (Loki single-binary + Promtail DaemonSet)"
+	helm upgrade --install loki grafana/loki-stack -n monitoring --create-namespace \
+	  --set loki.isDefault=false --set promtail.enabled=true
+	@echo ">> registrando o Loki como datasource do Grafana (sidecar do kps)"
+	kubectl apply -f k8s/observability/loki-datasource.yaml
+	@echo ">> aguardando Promtail (1 pod por nó)"
+	kubectl rollout status daemonset/loki-promtail -n monitoring --timeout=180s
+	@echo "OK. Grafana → Explore → Loki. Ex.: {namespace=\"default\"} | json | nivel=\"FULL\""
 
 # ── Deploy no cluster kind (Trilha A, §4.8) ──────────────────────────────────
 SERVICES = api-gateway authorization patient-data data-transform

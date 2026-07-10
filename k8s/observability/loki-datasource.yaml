@@ -1,0 +1,27 @@
+# Registra o Loki como datasource no Grafana do kube-prometheus-stack SEM tocar nos values do kps.
+# O sidecar de datasources do kps-grafana observa ConfigMaps com o label `grafana_datasource: "1"`
+# na namespace `monitoring` e os carrega automaticamente. O Loki (chart loki-stack) expõe o Service
+# `loki:3100` na mesma namespace.
+#
+# Consulta no Grafana → Explore → datasource Loki. Os logs do gateway são JSON, então:
+#   {namespace="default", pod=~"api-gateway.*"} | json | nivel="FULL"
+#   {namespace="default"} | json | status="429"          # rate limiting em ação
+#   {namespace="default"} | json | username="med.cardoso" # trilha de auditoria por usuário
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: loki-grafana-datasource
+  namespace: monitoring
+  labels:
+    grafana_datasource: "1"
+data:
+  loki-datasource.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Loki
+        type: loki
+        access: proxy
+        url: http://loki:3100
+        isDefault: false
+        jsonData:
+          maxLines: 1000
