@@ -155,6 +155,59 @@
           "legendFormat": "{{pod}}"
         }
       ]
+    },
+    {
+      "type": "row",
+      "title": "DB (Postgres) — lado do banco (§7.1: o gargalo esperado)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 30 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Transações/s (consultas ao banco)",
+      "description": "§5.1 'número de consultas ao banco'. commit+rollback por segundo. Achata quando o Postgres satura.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 31 },
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "sum(rate(pg_stat_database_xact_commit{datname=\"hospital\"}[1m]) + rate(pg_stat_database_xact_rollback{datname=\"hospital\"}[1m]))",
+          "legendFormat": "tps"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Conexões ativas (numbackends)",
+      "description": "Backends conectados ao banco 'hospital'. O limite default do Postgres é 100 — o platô aqui denuncia o teto, cruzando com a fila do HikariCP (lado app).",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 31 },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "pg_stat_database_numbackends{datname=\"hospital\"}",
+          "legendFormat": "conexões"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Cache hit ratio (%)",
+      "description": "Fração de blocos servidos da memória vs disco. Cair sob carga = pressão de I/O no banco.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 31 },
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "100 * rate(pg_stat_database_blks_hit{datname=\"hospital\"}[1m]) / clamp_min(rate(pg_stat_database_blks_hit{datname=\"hospital\"}[1m]) + rate(pg_stat_database_blks_read{datname=\"hospital\"}[1m]), 1)",
+          "legendFormat": "cache hit %"
+        }
+      ]
     }
   ]
 }

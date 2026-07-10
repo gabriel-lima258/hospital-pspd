@@ -51,7 +51,7 @@ docs/             # roteiro, prompts.md, evidencias/
 - `make up` / `make rebuild` — sobe tudo local (docker-compose); `rebuild` recompila as imagens.
 - `make cluster` — cria kind 1+3 + metrics-server + kube-prometheus-stack.
 - `make seed` — popula o banco no volume-alvo (`seed=42`, reprodutível).
-- `make deploy` — build das imagens + `kind load` + aplica `k8s/base` e `k8s/observability` (**não** o HPA).
+- `make deploy` — build das imagens + `kind load` + aplica `k8s/base` e `k8s/observability` (**não** o HPA). Inclui o **postgres-exporter** (métricas `pg_stat_*` do banco → dashboard, §7.1).
 - `make scale N=3` · `make pods-wide` — fixa réplicas · distribuição dos pods entre workers.
 - `make watch-hpa SCENARIO=hpa` — série temporal de réplicas/CPU → CSV (rodar em background na rampa).
 - `make grpc-lb-on|off` — headless+`round_robin` (default) × ClusterIP+`pick_first` (o "antes" do §7.3).

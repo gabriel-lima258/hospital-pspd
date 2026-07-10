@@ -304,6 +304,8 @@ Gradle:
 - ✅ **Logs agregados (bônus)** — Loki + Promtail (`make loki`); LogQL no Grafana sobre o JSON.
 - ✅ **Tracing distribuído (bônus)** — OTel agent + Tempo (`make tracing`); trace `REST→gRPC→SQL`
   com salto trace→log por `trace_id`. Fecha o triângulo métricas+logs+traces no mesmo Grafana.
+- ✅ **Métricas do banco (bônus)** — `postgres-exporter` (`k8s/observability/`, via `make deploy`):
+  `pg_stat_*` no dashboard (tps, conexões, cache hit) → prova o gargalo do Postgres (§7.1).
 - 🚧 **M3/M4** — dashboards RED/USE, baterias k6 (10/50/100/500/1000 VUs), escalabilidade e HPA.
   Falta **medir** (rodar o k6) e o dashboard: é onde estão os **80% da nota**.
 

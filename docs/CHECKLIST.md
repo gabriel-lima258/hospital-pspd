@@ -157,7 +157,7 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
 ### 🚦 Portão 6 = M5 — Ponto extra + reteste + análise (D6) ⬜ ➕
 - [x] ➕ **Loki + Promtail** (`make loki`) — Promtail (DaemonSet) coleta o stdout dos pods → Loki → datasource auto-registrado no Grafana do kps (`k8s/observability/loki-datasource.yaml`). Empilha no logging JSON: LogQL `{namespace="default"} | json | nivel="FULL"`. _Arthur adiantou._ **Falta screenshot** (Grafana Explore) → `docs/evidencias/`
 - [x] ➕ **Tracing distribuído** — OTel Java agent nos 4 serviços (embutido nas imagens, toggle `OTEL_SDK_DISABLED`, OFF por default) + **Tempo** (`make tracing`). Auto-instrumenta HTTP/gRPC/JDBC → trace `REST→gRPC→gRPC→SQL`. Datasource `tempo-datasource.yaml` com `tracesToLogsV2`→Loki (salto trace→log por `trace_id`). _Arthur adiantou._ **Falta screenshot** (trace multi-serviço + salto p/ log) → `docs/evidencias/tracing-tempo.md`
-- [ ] **Guilherme** ➕ `postgres-exporter` (métricas do banco no Prometheus)
+- [x] ➕ **`postgres-exporter`** — `k8s/observability/postgres-exporter.yaml` (Deployment+Service+ServiceMonitor), lê `pg_stat_*` do `db`. Dashboard ganhou a row **DB (Postgres)**: tps (§5.1 "consultas ao banco"), conexões (teto), cache hit. Aplicado por `make deploy`. _Arthur adiantou._ **Falta screenshot sob carga** (§7.1: tps/conexões no teto + fila HikariCP) → `docs/evidencias/postgres-exporter-db.md`
 - [ ] **Carlos** Todos os cenários (1replica/3replicas/hpa) coletados sob condições idênticas (§4.9)
 - [ ] **Carlos** `loadtest/plot.py` gera todos os gráficos comparativos → `docs/evidencias/*.png`
 - [ ] **Guilherme** Conclusões por fase rascunhadas (consolida o que cada trilha mediu)
@@ -287,9 +287,10 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
 | | Vídeo 4–6 min/aluno | ⬜ | todos aparecem; fechar com as 3 descobertas |
 | | README reproduzível (`make …`) | 🟡 | falta `make demo` + fases de carga |
 | | Frontend mínimo (login OIDC + 3 consultas, §9.1) | ⬜ | P2, baixo peso; serve ao vídeo/demo; 1º a cortar |
-| **➕** bônus | Tracing OTel+Tempo | ⬜ ➕ | melhor ROI |
-| | Dashboard-radiador (RED dos 4) | ⬜ ➕ | em cima dos dashboards obrigatórios |
-| | postgres-exporter · reflexão cap.15–16 | ⬜ ➕ | reflexão é **exigida** pela spec e ainda conta extra |
+| **➕** bônus | Tracing OTel+Tempo | ✅ ➕ | tooling pronto (`make tracing`); falta screenshot |
+| | Loki + logs JSON | ✅ ➕ | `make loki`; falta screenshot |
+| | postgres-exporter | ✅ ➕ | tooling pronto (`make deploy`); falta screenshot sob carga |
+| | reflexão cap.15–16 | ⬜ ➕ | exigida pela spec; entra no relatório |
 
 **Garantido hoje:** fundação sólida (M1a/M1), **M2 fechado** — integração ponta-a-ponta, volume real,
 decisão de acesso correta e testada, e o *enforcement* dela nas 3 jornadas REST.
