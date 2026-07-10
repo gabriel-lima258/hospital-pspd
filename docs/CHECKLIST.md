@@ -135,7 +135,7 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
 - 📎 Evidências: `docs/evidencias/{patient-data-coorte.md, data-transform-niveis.md, pesquisador-coorte.md}`
 
 ### 🚦 Portão 4 = M3 — Observabilidade + carga 1 réplica, Fases (e)+(b) (D4) ⬜
-- [ ] **Guilherme** Dashboard Grafana **RED + USE**, **≥5 métricas** ao vivo (JSON versionado + screenshot)
+- [x] Dashboard Grafana **RED + USE** — JSON versionado `k8s/observability/dashboards/red-use.json` (7 painéis, 6 métricas: RED do Gateway [rate/erro5xx/p95-p99] + USE [CPU/mem por pod, saturação HikariCP] + pods-ready/HPA). `make dashboard` importa via sidecar. _Arthur adiantou._ **Falta screenshot ao vivo** (sob carga) → `docs/evidencias/dashboard-red-use.md`
 - [x] **Rate limiting** no Gateway (exigido pelo enunciado) — filtro token-bucket por usuário após a autenticação, 429 + `Retry-After`; toggle `GATEWAY_RATELIMIT_ENABLED` (a carga desliga p/ não medir o limitador). 5 testes JUnit ✅ · `ratelimit/{TokenBucket,RateLimitFilter,RateLimitProperties}`. **Validado E2E** 2026-07-10: rajada `-P20` → 72×200 + 128×429 · `docs/evidencias/rate-limit-429.md`. _Arthur adiantou (Trilha B)._
 - [x] **Logging estruturado** (JSON) no Gateway — `AccessLogFilter` emite `http_access` com `username`/`role`/`nivel`/`patient_id`/`status`/`duration_ms` via MDC; `logback-spring.xml` + `logstash-logback-encoder` serializam em JSON no stdout (pronto p/ Promtail→Loki). 3 testes JUnit ✅ · `observability/{AccessLogFilter,RequestFields}`. **Validado E2E** 2026-07-10: linha `http_access` com `nivel=FULL`/`patient_id=P000001`/`status=200` · `docs/evidencias/logging-json.md`. _Arthur adiantou (Trilha B)._ Próximo: **Loki** (agregação) ➕
 - [x] **Erro gRPC→HTTP**: `GrpcHttpExceptionHandler` (@RestControllerAdvice) mapeia por código — `NOT_FOUND`→404, `INVALID_ARGUMENT`→400, `PERMISSION_DENIED`→403, `UNAVAILABLE`→503, resto→502. Patient Data sinaliza `NOT_FOUND` p/ paciente inexistente (era 500). 7 testes JUnit ✅. _Arthur adiantou (Trilha B)._ **Falta validar E2E** (`curl` paciente inexistente → 404)
@@ -219,7 +219,7 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
 1. **Carlos** · **⭐🔴 RODAR `make load`** _(Portão 4)_ — o harness está **pronto** (`scenario.js`, `gen-tokens.sh`, `run-load-tests.sh`, `collect-metrics.sh`, `plot.py`; `make load`/`make plot` reais). Falta **executar** a bateria (`1replica` primeiro) e coletar os números. Pré-req: `k6`+`jq` na WSL. Ver `loadtest/README.md`.
 2. **Arthur** · **⭐ Evidências de escala** _(Portão 5)_ — `kubectl get hpa` com `%/60%`, `get hpa -w` sob carga, `make pods-wide`. Sem isso o manifesto não vale nota.
 3. **Carlos** · **⭐ 3replicas + HPA medidos** _(Portão 5)_ — as duas baterias restantes. **Não depende mais do Arthur** (toggle).
-4. **Guilherme** · **⭐ Dashboards RED/USE** _(Portão 4)_ — JSON versionado + ≥5 métricas + screenshots.
+4. **Dashboards RED/USE** _(Portão 4)_ — ✅ JSON versionado + 6 métricas (`make dashboard`, Arthur adiantou). **Resta (Guilherme):** screenshot ao vivo sob carga + leitura no relatório.
 5. **Carlos** · **⭐ `plot.py` + CSVs → PNGs** _(Portão 6)_ — gráficos comparativos.
 6. **Guilherme** · **➕ Tracing (OTel + Tempo)** _(Portão 6)_ — melhor ROI de bônus.
 7. **Gateway maduro** _(Portão 4)_ — ✅ rate limiting, ✅ logging estruturado JSON, ✅ erro gRPC→HTTP global (`GrpcHttpExceptionHandler`: paciente inexistente → 404) já feitos (Arthur adiantou; ver itens do Portão 4). **Resta só (Mateus):** readiness _dependency-aware_ que checa o DB.

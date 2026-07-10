@@ -59,6 +59,7 @@ docs/             # roteiro, prompts.md, evidencias/
 - `make load SCENARIO=1replica|3replicas-off|3replicas-on|hpa` — bateria k6 (10/50/100/500/1000 VUs): prepara o estado do cluster, port-forward efêmero, warm-up+3min+cool-down por nível, summary→`loadtest/out/`. **Falta rodar/medir (Trilha D).**
 - `make plot` — summaries do k6 → `docs/evidencias/resultados.csv` + PNGs (throughput/p95/1v3). Não depende do Prometheus.
 - `make loki` — **(bônus)** Loki + Promtail na namespace `monitoring`; datasource auto-registrado no Grafana do kps. Agrega os logs JSON do Gateway; consulta LogQL `{namespace="default"} | json | nivel="FULL"`.
+- `make dashboard` — importa o dashboard **RED/USE** (`k8s/observability/dashboards/red-use.json`) no Grafana do kps via ConfigMap (sidecar). RED do Gateway + USE por pod + pods/HPA + saturação HikariCP.
 - `make demo` — deploy + seed enxuto + smoke das 3 jornadas; `DEMO_FRESH=1` recria o cluster.
 - `./gradlew build` — compila, testa e gera os stubs proto.
 

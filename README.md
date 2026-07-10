@@ -226,6 +226,7 @@ Detalhes dos claims em `[docs/contratos.md](docs/contratos.md)`. Para recriar o 
 | `make cluster-down`                         | Deleta o cluster kind (`pspd`)                                                                  | ✅        |
 | `make grafana`                              | Port-forward do Grafana em [http://localhost:3000](http://localhost:3000) (imprime user admin + senha do secret) | ✅        |
 | `make loki`                                 | **(bônus)** Loki + Promtail: agrega os logs JSON no Grafana; LogQL `\| json \| nivel="FULL"`    | ✅        |
+| `make dashboard`                            | Importa o dashboard **RED/USE** no Grafana do kps (fase e da observabilidade)                   | ✅        |
 | `make seed`                                 | Semeia o **cluster** via Job k8s (`SCALE=50000`, `seed=42`, `COPY`) — ~50k pacientes, ~1–2M eventos | ✅        |
 | `make seed-local`                           | Semeia o banco do **compose** (`localhost:5433`) via venv Python. `SCALE=` ajusta o volume     | ✅        |
 | `make deploy`                               | Build das imagens + `kind load` + aplica `k8s/base` e `k8s/observability` (**não** o HPA)        | ✅        |

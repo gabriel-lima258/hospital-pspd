@@ -1,6 +1,6 @@
 # Makefile — Hospital Universitário (PSPD/UnB). Tudo que repete vira alvo (regra de ouro 4).
 .PHONY: up rebuild down logs cluster cluster-down grafana check-cluster-tools images deploy redeploy \
-        seed seed-local grpc-lb-on grpc-lb-off hpa-on hpa-off scale pods-wide watch-hpa load plot loki demo help
+        seed seed-local grpc-lb-on grpc-lb-off hpa-on hpa-off scale pods-wide watch-hpa load plot loki dashboard demo help
 
 # Nome do cluster kind (usado por cluster / cluster-down / deploy futuro).
 KIND_CLUSTER ?= pspd
@@ -15,6 +15,7 @@ help:
 	@echo "  make cluster-down - deleta o cluster kind ($(KIND_CLUSTER))"
 	@echo "  make grafana     - port-forward do Grafana em http://localhost:3000 (admin + senha do secret)"
 	@echo "  make loki        - Loki + Promtail (bônus): agrega logs JSON no Grafana (LogQL)"
+	@echo "  make dashboard   - importa o dashboard RED/USE no Grafana do kps (fase e)"
 	@echo "  make deploy      - build+kind load das imagens + aplica k8s/base + k8s/observability [D2 ✓]"
 	@echo "  make redeploy    - rebuild + kind load + rollout restart dos 4 serviços [D2 ✓]"
 	@echo "  make seed        - semeia o banco no CLUSTER via Job (SCALE=$(SCALE), seed=42) [D3 ✓]"
@@ -103,6 +104,15 @@ loki: check-cluster-tools
 	@echo ">> aguardando Promtail (1 pod por nó)"
 	kubectl rollout status daemonset/loki-promtail -n monitoring --timeout=180s
 	@echo "OK. Grafana → Explore → Loki. Ex.: {namespace=\"default\"} | json | nivel=\"FULL\""
+
+# Dashboard RED/USE (fase e da observabilidade). JSON versionado → ConfigMap com o label que o
+# sidecar de dashboards do kps-grafana observa e importa. Rodar após `make cluster`.
+dashboard: check-cluster-tools
+	kubectl create configmap red-use-dashboard -n monitoring \
+	  --from-file=red-use.json=k8s/observability/dashboards/red-use.json \
+	  --dry-run=client -o yaml | kubectl apply -f -
+	kubectl label configmap red-use-dashboard -n monitoring grafana_dashboard=1 --overwrite
+	@echo "OK. Grafana → Dashboards → 'Hospital PSPD — RED / USE' (via make grafana)."
 
 # ── Deploy no cluster kind (Trilha A, §4.8) ──────────────────────────────────
 SERVICES = api-gateway authorization patient-data data-transform
