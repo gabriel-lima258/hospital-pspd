@@ -76,7 +76,7 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
 | **D3** | Engordar serviços + seed em volume | **M2** | ✅ | Seed ✅ + authz ✅ + enforcement ✅ + **3 jornadas REST** ✅ |
 | **D4** | Observabilidade + 1ª bateria de carga | **M3** | ⬜ ← **AQUI** | Dashboards + carga 1 réplica (10→1000 VUs) |
 | **D5** | Escalabilidade horizontal + HPA | **M4** | ⬜ | 3 réplicas + HPA medidos; fix gRPC LB antes |
-| **D6** | Ponto extra + reteste + análise | **M5** | ⬜ ➕ | Tracing OTel+Tempo + todos os cenários |
+| **D6** | Ponto extra + reteste + análise | **M5** | ⬜ ➕ | Tracing OTel+Tempo ✅ (tooling) · Loki ✅ · falta rodar todos os cenários + análise |
 | **D7** | Relatório + gráficos + vídeo | **M6** | ⬜ | Entrega no Moodle (zip) |
 
 **Progresso por fase metodológica** (§9.5 do roteiro):
@@ -156,7 +156,7 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
 
 ### 🚦 Portão 6 = M5 — Ponto extra + reteste + análise (D6) ⬜ ➕
 - [x] ➕ **Loki + Promtail** (`make loki`) — Promtail (DaemonSet) coleta o stdout dos pods → Loki → datasource auto-registrado no Grafana do kps (`k8s/observability/loki-datasource.yaml`). Empilha no logging JSON: LogQL `{namespace="default"} | json | nivel="FULL"`. _Arthur adiantou._ **Falta screenshot** (Grafana Explore) → `docs/evidencias/`
-- [ ] **Guilherme** ➕ Tracing distribuído: OTel Java agent nos 4 serviços + **Tempo** (trace multi-serviço)
+- [x] ➕ **Tracing distribuído** — OTel Java agent nos 4 serviços (embutido nas imagens, toggle `OTEL_SDK_DISABLED`, OFF por default) + **Tempo** (`make tracing`). Auto-instrumenta HTTP/gRPC/JDBC → trace `REST→gRPC→gRPC→SQL`. Datasource `tempo-datasource.yaml` com `tracesToLogsV2`→Loki (salto trace→log por `trace_id`). _Arthur adiantou._ **Falta screenshot** (trace multi-serviço + salto p/ log) → `docs/evidencias/tracing-tempo.md`
 - [ ] **Guilherme** ➕ `postgres-exporter` (métricas do banco no Prometheus)
 - [ ] **Carlos** Todos os cenários (1replica/3replicas/hpa) coletados sob condições idênticas (§4.9)
 - [ ] **Carlos** `loadtest/plot.py` gera todos os gráficos comparativos → `docs/evidencias/*.png`
@@ -196,9 +196,9 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
 | **k8s/observability** | **Guilherme** | 🟡 | só ServiceMonitor; **sem dashboard JSON** | `k8s/observability/servicemonitor.yaml` |
 | **HPA** | **Arthur** | 🟡 | manifesto pronto (v2, min1/max10, CPU 60%, 4 serviços); **falta aplicar e evidenciar `%/60%`** | `k8s/hpa/hpa.yaml` |
 | **Services gRPC** | **Arthur** | 🟡 | headless + `round_robin` é o **default**; toggle `grpc-lb-off` reproduz o ClusterIP p/ o §7.3. **Falta medir antes/depois** | `k8s/base/grpc-headless.yaml`, gateway `application.yml` |
-| **loadtest** | **Carlos** | ⬜ | vazio (só `.gitkeep`) | `loadtest/` |
+| **loadtest** | **Carlos** | 🟡 | harness pronto (`scenario.js`, `gen-tokens.sh`, `run-load-tests.sh`, `collect-metrics.sh`, `plot.py`; Arthur adiantou) — **falta rodar** e coletar | `loadtest/` |
 | **frontend** | **Guilherme** | ⬜ | vazio (só `.gitkeep`) — **obrigatório mínimo** (§9.1: login OIDC + 3 consultas), mas P2 e 1º a cortar | `frontend/` · client `hospital-frontend` no realm |
-| **tracing (OTel+Tempo)** | **Guilherme** | ⬜ ➕ | inexistente (bônus) | — |
+| **tracing (OTel+Tempo)** | — | ✅ ➕ | OTel agent nos 4 (`Dockerfile`) + `make tracing` + `tempo-datasource.yaml`; Arthur adiantou. Falta screenshot | `services/*/Dockerfile` · `k8s/observability/tempo-datasource.yaml` |
 | **Makefile** | **Arthur** | ✅ | todos os alvos reais: `rebuild`, `demo`, `scale`, `pods-wide`, `grpc-lb-on|off`, `hpa-on|off`, e agora `load`/`plot` (harness k6 em `loadtest/`) | `Makefile` |
 
 ---
@@ -221,7 +221,7 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
 3. **Carlos** · **⭐ 3replicas + HPA medidos** _(Portão 5)_ — as duas baterias restantes. **Não depende mais do Arthur** (toggle).
 4. **Dashboards RED/USE** _(Portão 4)_ — ✅ JSON versionado + 6 métricas (`make dashboard`, Arthur adiantou). **Resta (Guilherme):** screenshot ao vivo sob carga + leitura no relatório.
 5. **Carlos** · **⭐ `plot.py` + CSVs → PNGs** _(Portão 6)_ — gráficos comparativos.
-6. **Guilherme** · **➕ Tracing (OTel + Tempo)** _(Portão 6)_ — melhor ROI de bônus.
+6. **Tracing (OTel + Tempo)** _(Portão 6)_ — ✅ tooling (`make tracing`, Arthur adiantou). **Resta (Guilherme):** ligar sob debug + screenshot do trace multi-serviço e do salto trace→log.
 7. **Gateway maduro** _(Portão 4)_ — ✅ rate limiting, ✅ logging estruturado JSON, ✅ erro gRPC→HTTP global (`GrpcHttpExceptionHandler`: paciente inexistente → 404) já feitos (Arthur adiantou; ver itens do Portão 4). **Resta só (Mateus):** readiness _dependency-aware_ que checa o DB.
 8. **Guilherme** · **frontend mínimo** _(§9.1 / §9.7 · Portão 3+7)_ — **obrigatório, mas mínimo e P2** (baixo valor isolado; **primeiro a cortar** sob pressão — ordem de corte §R9: frontend rico → FHIR 100% → cenários extras).
    - **Objetivo:** 1 SPA enxuta que autentica via **OAuth2/OIDC no Keycloak** (client `hospital-frontend`, Standard Flow) e faz as **3 consultas** (médico→FULL, estagiário→PARTIAL, pesquisador→coorte), renderizando conforme o nível retornado.

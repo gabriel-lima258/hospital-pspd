@@ -227,6 +227,7 @@ Detalhes dos claims em `[docs/contratos.md](docs/contratos.md)`. Para recriar o 
 | `make grafana`                              | Port-forward do Grafana em [http://localhost:3000](http://localhost:3000) (imprime user admin + senha do secret) | ✅        |
 | `make loki`                                 | **(bônus)** Loki + Promtail: agrega os logs JSON no Grafana; LogQL `\| json \| nivel="FULL"`    | ✅        |
 | `make dashboard`                            | Importa o dashboard **RED/USE** no Grafana do kps (fase e da observabilidade)                   | ✅        |
+| `make tracing` / `tracing-off`              | **(bônus)** Tempo + OTel agent: liga/desliga traces `REST→gRPC→SQL` no Grafana (trace→log)      | ✅        |
 | `make seed`                                 | Semeia o **cluster** via Job k8s (`SCALE=50000`, `seed=42`, `COPY`) — ~50k pacientes, ~1–2M eventos | ✅        |
 | `make seed-local`                           | Semeia o banco do **compose** (`localhost:5433`) via venv Python. `SCALE=` ajusta o volume     | ✅        |
 | `make deploy`                               | Build das imagens + `kind load` + aplica `k8s/base` e `k8s/observability` (**não** o HPA)        | ✅        |
@@ -301,6 +302,8 @@ Gradle:
 - ✅ **Gateway maduro** — rate limiting por usuário (429), logging estruturado JSON (auditoria),
   erro gRPC→HTTP global (404/400/…). Harness k6 (`make load`/`make plot`) pronto.
 - ✅ **Logs agregados (bônus)** — Loki + Promtail (`make loki`); LogQL no Grafana sobre o JSON.
+- ✅ **Tracing distribuído (bônus)** — OTel agent + Tempo (`make tracing`); trace `REST→gRPC→SQL`
+  com salto trace→log por `trace_id`. Fecha o triângulo métricas+logs+traces no mesmo Grafana.
 - 🚧 **M3/M4** — dashboards RED/USE, baterias k6 (10/50/100/500/1000 VUs), escalabilidade e HPA.
   Falta **medir** (rodar o k6) e o dashboard: é onde estão os **80% da nota**.
 

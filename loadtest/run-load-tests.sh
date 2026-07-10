@@ -41,6 +41,18 @@ echo ">>> desligando rate limiting para a medição (GATEWAY_RATELIMIT_ENABLED=f
 kubectl set env deploy/api-gateway GATEWAY_RATELIMIT_ENABLED=false >/dev/null
 kubectl rollout status deploy/api-gateway --timeout=120s >/dev/null
 
+# Tracing OFF durante a medição (defensivo): o export de spans a 100% adicionaria overhead e
+# contaminaria latência/CPU. O default das imagens já é inerte; reforça aqui caso `make tracing`
+# tenha sido usado antes.
+echo ">>> garantindo tracing desligado (OTEL_SDK_DISABLED=true nos 4 serviços)"
+for s in api-gateway authorization patient-data data-transform; do
+  kubectl set env deploy/"$s" OTEL_SDK_DISABLED=true >/dev/null
+done
+# espera estabilizar (set env só reinicia se o valor mudou; no-op nas baterias seguintes)
+for s in api-gateway authorization patient-data data-transform; do
+  kubectl rollout status deploy/"$s" --timeout=120s >/dev/null
+done
+
 # ── 2. Port-forwards efêmeros (Keycloak p/ tokens, gateway p/ k6) ─────────────
 PF_PIDS=()
 cleanup() { for p in "${PF_PIDS[@]:-}"; do kill "$p" 2>/dev/null || true; done; }

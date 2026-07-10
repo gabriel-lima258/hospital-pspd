@@ -60,6 +60,7 @@ docs/             # roteiro, prompts.md, evidencias/
 - `make plot` — summaries do k6 → `docs/evidencias/resultados.csv` + PNGs (throughput/p95/1v3). Não depende do Prometheus.
 - `make loki` — **(bônus)** Loki + Promtail na namespace `monitoring`; datasource auto-registrado no Grafana do kps. Agrega os logs JSON do Gateway; consulta LogQL `{namespace="default"} | json | nivel="FULL"`.
 - `make dashboard` — importa o dashboard **RED/USE** (`k8s/observability/dashboards/red-use.json`) no Grafana do kps via ConfigMap (sidecar). RED do Gateway + USE por pod + pods/HPA + saturação HikariCP.
+- `make tracing` / `make tracing-off` — **(bônus)** liga/desliga o **tracing** (Tempo + OTel Java agent, já embutido nas imagens, inerte por default). `tracing` sobe o Tempo, registra o datasource e ativa o export nos 4 serviços → trace `REST→gRPC→gRPC→SQL` no Grafana, com salto trace→log via `trace_id`. As baterias k6 desligam o tracing (não contamina).
 - `make demo` — deploy + seed enxuto + smoke das 3 jornadas; `DEMO_FRESH=1` recria o cluster.
 - `./gradlew build` — compila, testa e gera os stubs proto.
 

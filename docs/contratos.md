@@ -97,6 +97,12 @@ no stdout (via `logstash-logback-encoder`), com os campos de auditoria: `usernam
 limiting e o 404 de recurso inexistente. Formato pronto para Promtail→Loki (campos consultáveis sem
 regex). `/actuator/**` não é logado.
 
+**Tracing** (OTel Java agent, `make tracing`) — quando ligado, o agent propaga o contexto de trace
+pelo header **`traceparent`** (W3C Trace Context) sobre HTTP **e** gRPC, então os spans dos 4 serviços
+entram no mesmo trace (`REST→gRPC→gRPC→gRPC→SQL`). O agent também injeta `trace_id`/`span_id` no MDC,
+que passam a aparecer na linha `http_access` do gateway → correlação trace↔log no Grafana (Tempo→Loki).
+Não altera o contrato gRPC (proto) nem o REST — é transporte de metadados, transparente às rotas.
+
 **Enforcement do nível** (Data Transform, desde o P3b) — o nível **decide a forma da saída**, não anota o dado:
 
 | Nível | Saída | Mantém | Remove |
