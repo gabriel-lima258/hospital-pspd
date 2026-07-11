@@ -7,13 +7,14 @@
 > [`docs/Roteiro_PSPD_Observabilidade_K8S.md`](Roteiro_PSPD_Observabilidade_K8S.md) (§3 cronograma,
 > §5 métricas, §7 descobertas, §9 entrega, **Apêndice A** portões 0–7).
 >
-> **Última atualização:** 2026-07-10 · **Fase atual:** **D4 / M3** (observabilidade + 1ª bateria de carga).
+> **Última atualização:** 2026-07-11 · **Fase atual:** **D4/D5 em andamento** — o backend funcional e a infra de escala/observabilidade estão implementados, mas a fase de carga ainda não foi executada de forma verificável.
+> **Avaliação verificada hoje:** `./gradlew test` → **BUILD SUCCESSFUL**; o backend core está funcional e com testes verdes; o frontend ainda está apenas como placeholder (`frontend/.gitkeep`); a execução real das baterias k6/HPA e a coleta de evidências continuam pendentes.
 > O **M2 fechou**: P3a ✅ fonte de dados de coorte · P3b ✅ enforcement por nível + FHIR completo ·
 > P3c ✅ rota REST de coorte — as **3 jornadas** (médico/FULL, estagiário/PARTIAL, pesquisador/AGG+ANON)
 > validadas ponta-a-ponta no cluster.
 >
 > A **Trilha A** entregou a infra de escala: Service headless + `round_robin`, HPA (min1/max10/CPU 60%),
-> toggles `grpc-lb-on|off` / `hpa-on|off` / `scale N=`, e `make demo` real. **Nada disso foi medido ainda.**
+> toggles `grpc-lb-on|off` / `hpa-on|off` / `scale N=`, e `make demo` real. **O que falta agora é medir isso com carga real e registrar evidências**.
 > Daqui em diante a nota vem exclusivamente de **números medidos**.
 
 **Legenda:** ✅ feito · 🟡 parcial · ⬜ a fazer · ➕ bônus (ponto extra) · 🔴 crítico
@@ -74,9 +75,9 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
 | **D1** | Fundação (contratos, cluster, scaffolds) | **M1a** | ✅ | Cluster 1+3, 3 contratos, Keycloak, 4 scaffolds |
 | **D2** | Esqueleto ambulante ponta a ponta | **M1** 🔴 | ✅ | FHIR real no cluster + métrica no Grafana |
 | **D3** | Engordar serviços + seed em volume | **M2** | ✅ | Seed ✅ + authz ✅ + enforcement ✅ + **3 jornadas REST** ✅ |
-| **D4** | Observabilidade + 1ª bateria de carga | **M3** | ⬜ ← **AQUI** | Dashboards + carga 1 réplica (10→1000 VUs) |
-| **D5** | Escalabilidade horizontal + HPA | **M4** | ⬜ | 3 réplicas + HPA medidos; fix gRPC LB antes |
-| **D6** | Ponto extra + reteste + análise | **M5** | ⬜ ➕ | Tracing OTel+Tempo ✅ (tooling) · Loki ✅ · falta rodar todos os cenários + análise |
+| **D4** | Observabilidade + 1ª bateria de carga | **M3** | 🟡 | Dashboards + carga 1 réplica (10→1000 VUs) implementados em código, mas ainda não executados e documentados com números reais |
+| **D5** | Escalabilidade horizontal + HPA | **M4** | 🟡 | 3 réplicas + HPA base implementados; a medição e as evidências ainda estão pendentes |
+| **D6** | Ponto extra + reteste + análise | **M5** | 🟡 ➕ | Tracing OTel+Tempo ✅ (tooling) · Loki ✅ · falta rodar todos os cenários e consolidar a análise |
 | **D7** | Relatório + gráficos + vídeo | **M6** | ⬜ | Entrega no Moodle (zip) |
 
 **Progresso por fase metodológica** (§9.5 do roteiro):
@@ -92,6 +93,14 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
 ---
 
 ## 2. Checklist por PORTÃO (Apêndice A) — o núcleo
+
+### Resumo executivo da avaliação (2026-07-11)
+- [x] **Build e testes validados** — `./gradlew test` terminou com `BUILD SUCCESSFUL`.
+- [x] **Backend funcional e integrado** — gateway, authorization, patient-data e data-transform estão implementados e o fluxo ponta-a-ponta foi validado no cluster.
+- [x] **Infra/observabilidade base pronta** — manifests K8s, headless gRPC, HPA, dashboards e ferramentas de Loki/Tracing existem no repositório.
+- [ ] **Carga real ainda não executada** — as baterias k6, os cenários 1 réplica/3 réplicas/HPA e os gráficos comparativos ainda precisam ser rodados e registrados.
+- [ ] **Frontend mínimo pendente** — o diretório [frontend](../frontend) ainda está vazio, com apenas [frontend/.gitkeep](../frontend/.gitkeep); isso impacta a demo final e o vídeo.
+- [ ] **Entrega final pendente** — relatório, vídeo e consolidação das evidências continuam faltando.
 
 ### 🚦 Portão 0 — Máquina pronta ✅
 - [x] Ferramentas: Docker, kind, kubectl, helm, JDK 21, k6, Python3+psycopg2/faker, jq
