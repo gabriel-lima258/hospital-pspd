@@ -1,5 +1,28 @@
 # Evidências
 
+## Índice
+
+| Arquivo | Passo | O que prova |
+|---|---|---|
+| `seed-volume-cluster.md` | D3 | volume-alvo semeado no cluster (contagens conferidas no psql) |
+| `authz-matriz-completa.md` | D3 · P2 | matriz de decisão + todos os DENYs |
+| `patient-data-coorte.md` | D3 · P3a | agregação de coorte e amostra de exames (com `EXPLAIN`) |
+| `data-transform-niveis.md` | D3 · P3b | enforcement por nível + os 5 recursos FHIR |
+| `pesquisador-coorte.md` | D3 · **P3c** | as **3 jornadas REST**; a coorte nasce no servidor; 400/403/404/502 |
+| `escala-hpa-grpc-lb.md` | D5 · Portão 5 | blocos solo capturados (DNS 1×3, pods-wide, HPA %/60%, smoke); 🚧 carga (§2/§4b) pendente do k6 |
+| `hpa-timeline.csv` | D5 · Portão 5 | 🚧 gerado por `make watch-hpa` — réplicas/CPU × tempo, por cenário (gráfico §4.9 #6) |
+| `rate-limit-429.md` | D4 · Portão 4 | rate limiting: 429 sob rajada `-P20` (72×200 + 128×429) |
+| `logging-json.md` | D4 · Portão 4 | log de acesso JSON (auditoria: `username`/`role`/`nivel`/`patient_id`) |
+| `dashboard-red-use.md` | D4 · fase (e) | dashboard RED/USE (6 métricas); 🚧 screenshot sob carga |
+| `loki-logql.md` | D6 · ➕ | logs agregados no Loki (LogQL sobre o JSON); 🚧 screenshot |
+| `tracing-tempo.md` | D6 · ➕ | tracing OTel+Tempo (trace `REST→gRPC→SQL` + salto trace→log); 🚧 screenshot |
+| `postgres-exporter-db.md` | D6 · ➕ | métricas do banco (`pg_stat_*`), prova do §7.1; 🚧 screenshot sob carga |
+| `*http_server_requests*.json` | D2 · M1 | scrape do Gateway no Prometheus/Grafana |
+
+> Evidências antigas **não são reescritas** quando o código evolui: elas registram o que era verdade
+> na data. Ex.: `seed-volume-cluster.md` cita `clinical_events = 1.360.406`, contagem anterior ao fix
+> de `setor` + HbA1c; o valor atual (**1.387.934**) está em `pesquisador-coorte.md`.
+
 ## M1 — esqueleto ambulante no cluster kind (D2 final)
 
 Requisição real atravessa Gateway → Authorization → Patient Data → Postgres → Data Transform,

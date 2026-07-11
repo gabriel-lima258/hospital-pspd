@@ -1,8 +1,5 @@
 package com.hospital.gateway.adapters.in.rest;
 
-import java.util.List;
-import java.util.Set;
-
 import net.devh.boot.grpc.client.inject.GrpcClient;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -23,13 +20,13 @@ import hospital.PatientQuery;
 import hospital.TransformRequest;
 
 /**
- * Adapter de entrada REST do Gateway (D2 walking skeleton). Orquestra a pilha via gRPC:
- * Authorization.Check → (ALLOW) PatientData.Fetch → DataTransform.ToFhir. Só o caminho feliz.
+ * Adapter de entrada REST do Gateway — prontuário individual (médico/estagiário). Orquestra a pilha
+ * via gRPC: Authorization.Check → (ALLOW) PatientData.Fetch → DataTransform.ToFhir. Erros gRPC que
+ * escapam daqui são traduzidos pelo {@link GrpcHttpExceptionHandler} (ex.: paciente inexistente →
+ * NOT_FOUND → 404). A coorte do pesquisador tem rota própria em {@link FhirCohortController}.
  */
 @RestController
 public class FhirPatientController {
-
-    private static final Set<String> KNOWN_ROLES = Set.of("MEDICO", "ESTAGIARIO", "PESQUISADOR");
 
     @GrpcClient("authorization")
     private AuthorizationGrpc.AuthorizationBlockingStub authorizationStub;
@@ -43,7 +40,7 @@ public class FhirPatientController {
     @GetMapping("/fhir/Patient/{id}")
     public ResponseEntity<String> getPatient(@PathVariable String id, @AuthenticationPrincipal Jwt jwt) {
         String username = jwt.getClaimAsString("preferred_username");
-        String role = extractRole(jwt);
+        String role = JwtRoles.extractRole(jwt);
 
         // 1) Autorização.
         AuthzReply authz = authorizationStub.check(AuthzRequest.newBuilder()
@@ -55,6 +52,7 @@ public class FhirPatientController {
         if (!authz.getAllow()) {
             return ResponseEntity.status(403).build();
         }
+        org.slf4j.MDC.put("nivel", authz.getNivel());   // auditoria: nível servido (AccessLogFilter loga)
 
         // 2) Busca dos dados clínicos crus.
         ClinicalData data = patientDataStub.fetch(PatientQuery.newBuilder()
@@ -71,19 +69,5 @@ public class FhirPatientController {
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(fhir.getFhirJson());
-    }
-
-    /** Primeira role conhecida em realm_access.roles (o esqueleto só usa MEDICO). */
-    @SuppressWarnings("unchecked")
-    private String extractRole(Jwt jwt) {
-        Object realmAccess = jwt.getClaim("realm_access");
-        if (realmAccess instanceof java.util.Map<?, ?> map && map.get("roles") instanceof List<?> roles) {
-            for (Object r : roles) {
-                if (r instanceof String s && KNOWN_ROLES.contains(s)) {
-                    return s;
-                }
-            }
-        }
-        return "";
     }
 }

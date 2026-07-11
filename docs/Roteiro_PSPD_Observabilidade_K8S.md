@@ -555,6 +555,19 @@ grpc:
 > grpc.client.patient-data.defaultLoadBalancingPolicy: round_robin
 > ```
 > Documente o antes/depois — é ouro para a nota técnica.
+>
+> **Correção (2026-07-10, verificada na implementação):** dos dois itens acima, **só o `Service` headless
+> é o fix**. O `defaultLoadBalancingPolicy` **já vale `round_robin` por default** no
+> `net.devh:grpc-client-spring-boot-starter:3.1.0.RELEASE` (constante em `GrpcChannelProperties`) — o que
+> faltava era o DNS ter mais de um endereço para ele rodar. Com ClusterIP, o resolver devolve o único IP
+> virtual do Service e o round-robin gira sobre uma lista de um elemento. Mantemos a propriedade explícita
+> no `application.yml` como documentação da intenção e como proteção contra mudança de default upstream.
+> Implementação em `k8s/base/grpc-headless.yaml`; o antes/depois é reproduzível via `make grpc-lb-off|on`.
+>
+> **Segundo efeito, não previsto aqui:** com headless, pods novos criados pelo HPA demoram a entrar na
+> rotação (cache de DNS da JVM + o `DnsNameResolver` do grpc-java não re-resolver em background). Mitigar com
+> `-Dsun.net.inetaddr.ttl=5` — **não** com `-Dnetworkaddress.cache.ttl`, que é *security property* e é ignorada
+> como `-D`. O lag residual alimenta a descoberta §7.2.
 
 ### 4.7 Keycloak — realm, roles e emissão de JWT (Trilha E)
 

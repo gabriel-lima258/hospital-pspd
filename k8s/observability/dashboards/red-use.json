@@ -1,0 +1,213 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "graphTooltip": 1,
+  "time": { "from": "now-30m", "to": "now" },
+  "timezone": "browser",
+  "title": "Hospital PSPD — RED / USE",
+  "uid": "hospital-red-use",
+  "schemaVersion": 39,
+  "version": 1,
+  "tags": ["hospital-pspd", "red", "use"],
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "label": "Prometheus",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": {},
+        "hide": 0
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "row",
+      "title": "RED — visão da requisição (Gateway, entrada da pilha)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+    },
+    {
+      "type": "timeseries",
+      "title": "R — Throughput por status (req/s)",
+      "description": "Rate: requisições/s do Gateway agrupadas por código HTTP. Inclui 429 (rate limit) e 404.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "sum by (status) (rate(http_server_requests_seconds_count{application=\"api-gateway\"}[1m]))",
+          "legendFormat": "{{status}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "D — Latência p95 / p99 (Gateway)",
+      "description": "Duration: percentis da latência HTTP fim-a-fim. P95/P99, não média (Arundel & Domingus cap.16).",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{application=\"api-gateway\"}[1m])))",
+          "legendFormat": "p95"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_server_requests_seconds_bucket{application=\"api-gateway\"}[1m])))",
+          "legendFormat": "p99"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "E — Taxa de erro HTTP 5xx (%)",
+      "description": "Errors: fração de respostas 5xx. 4xx (403/404/429) são fluxo esperado, não erro de servidor.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 9 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 5 } ] }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "100 * sum(rate(http_server_requests_seconds_count{application=\"api-gateway\",status=~\"5..\"}[1m])) / clamp_min(sum(rate(http_server_requests_seconds_count{application=\"api-gateway\"}[1m])), 1)",
+          "legendFormat": "5xx %"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Pods prontos por deployment (chave do HPA)",
+      "description": "Nº de réplicas ready. Sobe sob carga quando o HPA escala; a distância p/ o desejado é o cold-start.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 6, "w": 16, "x": 8, "y": 9 },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "lineInterpolation": "stepAfter", "fillOpacity": 10 } }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "sum by (deployment) (kube_deployment_status_replicas_ready{namespace=\"default\"})",
+          "legendFormat": "{{deployment}}"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "USE — utilização dos recursos (por serviço)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 }
+    },
+    {
+      "type": "timeseries",
+      "title": "U — CPU por pod (cores)",
+      "description": "Utilization: uso de CPU por pod. Cruza com o HPA (target 60% do request de 250m) e mostra quem satura.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"default\", container!=\"\", container!=\"POD\"}[1m]))",
+          "legendFormat": "{{pod}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "U — Memória por pod (working set)",
+      "description": "Utilization: memória residente por pod. O Postgres (1 réplica stateful) é o gargalo esperado (§7.1).",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"default\", container!=\"\", container!=\"POD\"})",
+          "legendFormat": "{{pod}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "S — Saturação: fila do pool HikariCP (patient-data)",
+      "description": "Saturation (USE): threads esperando conexão do pool. > 0 sustentado = o banco é o gargalo (§7.1).",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 24 },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "sum by (pod) (hikaricp_connections_pending{namespace=\"default\"})",
+          "legendFormat": "{{pod}}"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "DB (Postgres) — lado do banco (§7.1: o gargalo esperado)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 30 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Transações/s (consultas ao banco)",
+      "description": "§5.1 'número de consultas ao banco'. commit+rollback por segundo. Achata quando o Postgres satura.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 31 },
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "sum(rate(pg_stat_database_xact_commit{datname=\"hospital\"}[1m]) + rate(pg_stat_database_xact_rollback{datname=\"hospital\"}[1m]))",
+          "legendFormat": "tps"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Conexões ativas (numbackends)",
+      "description": "Backends conectados ao banco 'hospital'. O limite default do Postgres é 100 — o platô aqui denuncia o teto, cruzando com a fila do HikariCP (lado app).",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 31 },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "pg_stat_database_numbackends{datname=\"hospital\"}",
+          "legendFormat": "conexões"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Cache hit ratio (%)",
+      "description": "Fração de blocos servidos da memória vs disco. Cair sob carga = pressão de I/O no banco.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 31 },
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "100 * rate(pg_stat_database_blks_hit{datname=\"hospital\"}[1m]) / clamp_min(rate(pg_stat_database_blks_hit{datname=\"hospital\"}[1m]) + rate(pg_stat_database_blks_read{datname=\"hospital\"}[1m]), 1)",
+          "legendFormat": "cache hit %"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+# Services headless (clusterIP: None) — alvo gRPC do api-gateway. Descoberta §7.3.
+#
+# Por que existem: um Service ClusterIP resolve para UM IP virtual. O cliente gRPC abre uma
+# única conexão HTTP/2 de longa duração e multiplexa todas as chamadas nela; o kube-proxy
+# balanceia conexões, não requisições. Resultado: com 3 réplicas, 1 pod recebe ~100% da carga.
+# O `defaultLoadBalancingPolicy: round_robin` (default do net.devh 3.1.0) não ajuda — ele faz
+# round-robin sobre a lista de endereços que o DNS devolveu, e essa lista tem 1 elemento.
+#
+# Com clusterIP: None o DNS devolve um registro A por pod → o round_robin tem sobre o que rodar.
+#
+# Os Services ClusterIP homônimos (em api-gateway.yaml etc.) permanecem: servem o scrape do
+# Prometheus (porta `http`) e o baseline "antes" do §7.3 (`make grpc-lb-off`).
+#
+# Sem o label `monitored: "true"` de propósito: o ServiceMonitor seleciona por esse label e
+# procura a porta de nome `http`, que aqui não existe.
+#
+# `publishNotReadyAddresses` fica no default (false): pod em cold-start da JVM não entra na
+# rotação antes do readinessProbe passar. Isso é parte da descoberta §7.2.
+apiVersion: v1
+kind: Service
+metadata:
+  name: authorization-headless
+  labels: { app: authorization }
+spec:
+  clusterIP: None
+  selector: { app: authorization }
+  ports:
+    - { name: grpc, port: 9090, targetPort: 9090 }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: patient-data-headless
+  labels: { app: patient-data }
+spec:
+  clusterIP: None
+  selector: { app: patient-data }
+  ports:
+    - { name: grpc, port: 9090, targetPort: 9090 }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: data-transform-headless
+  labels: { app: data-transform }
+spec:
+  clusterIP: None
+  selector: { app: data-transform }
+  ports:
+    - { name: grpc, port: 9090, targetPort: 9090 }

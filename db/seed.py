@@ -25,7 +25,8 @@
 # Alinhado aos usuários do Keycloak (senão a validação funcional falha):
 #   med.cardoso (MEDICO)     -> vínculo médico ATIVO com um bloco de pacientes (inclui P000001)
 #   est.almeida (ESTAGIARIO) -> supervisionado por med.cardoso, subconjunto dos pacientes dele
-#   pesq.souza  (PESQUISADOR)-> dono de PRJ01 (Diabetes/Aprovado/vigente) e PRJ02 (Expirado → DENY)
+#   pesq.souza  (PESQUISADOR)-> dono de PRJ01 (Diabetes/Aprovado/vigente), PRJ02 (Expirado → DENY)
+#                               e PRJ03 (Aprovado, condição "Rara" sem pacientes → coorte vazia/404)
 #   med.semvinculo (MEDICO)  -> SEM vínculos (caso DENY)
 # =============================================================================
 import argparse
@@ -268,13 +269,18 @@ def gen_assignments(scale):
 
 
 def gen_projects():
-    """~50 projetos. PRJ01/PRJ02 fixos p/ pesq.souza (casos ALLOW/DENY)."""
+    """~50 projetos. PRJ01..PRJ03 fixos p/ pesq.souza (casos ALLOW / DENY / coorte vazia)."""
     condicoes = ["Diabetes", "Hipertensao", "Creatinina", "Glicemia", "PressaoArterial"]
     rows = [
         ("PRJ01", "Coorte de diabeticos tipo 2", "pesq.souza", "Diabetes", "Aprovado", "2027-12-31"),
         ("PRJ02", "Estudo hipertensao (encerrado)", "pesq.souza", "Hipertensao", "Expirado", "2024-01-01"),
+        # Aprovado e vigente, mas "Rara" não existe em clinical_events.codigo_tipo → coorte com
+        # 0 pacientes. Fixture do 404 da rota de coorte (irmão do med.semvinculo p/ o 403).
+        ("PRJ03", "Coorte de doenca rara (vazia)", "pesq.souza", "Rara", "Aprovado", "2027-12-31"),
     ]
-    for n in range(3, 51):
+    # Começa em 4 porque PRJ03 virou fixo. gen_projects() é a ÚLTIMA a consumir o RNG (ver main),
+    # então encurtar este laço não desloca patients/encounters/events — as contagens seguem iguais.
+    for n in range(4, 51):
         cod = random.choice(condicoes)
         status = random.choices(["Aprovado", "Expirado", "Suspenso"], [0.5, 0.3, 0.2])[0]
         if status == "Aprovado":

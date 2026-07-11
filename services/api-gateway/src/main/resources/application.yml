@@ -10,17 +10,29 @@ spring:
           issuer-uri: http://keycloak:8080/realms/hospital
 
 # gRPC CLIENT (net.devh) — canais criados lazy na 1ª injeção de stub (sem conexão no boot).
+#
+# Os defaults apontam para os Services *headless* do cluster (k8s/base/grpc-headless.yaml):
+# só assim o DNS devolve um endereço por pod e o round_robin balanceia de fato (§7.3).
+#
+# As envs existem para reproduzir o arranjo que NÃO balanceia (ClusterIP + pick_first), usado
+# na medição do "antes" do §7.3: `make grpc-lb-off`. O docker-compose também as usa, porque
+# na rede do compose não existem os nomes `*-headless`.
+#
+# Nomes de env explícitos (e não relaxed binding) por causa do hífen em `patient-data`.
 grpc:
   client:
     authorization:
-      address: 'dns:///authorization:9090'
+      address: ${GRPC_AUTHORIZATION_ADDRESS:dns:///authorization-headless:9090}
       negotiationType: plaintext
+      defaultLoadBalancingPolicy: ${GRPC_LB_POLICY:round_robin}
     patient-data:
-      address: 'dns:///patient-data:9090'
+      address: ${GRPC_PATIENT_DATA_ADDRESS:dns:///patient-data-headless:9090}
       negotiationType: plaintext
+      defaultLoadBalancingPolicy: ${GRPC_LB_POLICY:round_robin}
     data-transform:
-      address: 'dns:///data-transform:9090'
+      address: ${GRPC_DATA_TRANSFORM_ADDRESS:dns:///data-transform-headless:9090}
       negotiationType: plaintext
+      defaultLoadBalancingPolicy: ${GRPC_LB_POLICY:round_robin}
 
 # Observabilidade (§4.5): expõe /actuator/prometheus, tag por serviço e histograma p/ p95/p99.
 management:
@@ -34,6 +46,20 @@ management:
     distribution:
       percentiles-histogram:
         http.server.requests: true
+
+# Config do Gateway (namespace próprio, fora do Spring).
+gateway:
+  # Deadline default das chamadas gRPC (protege o thread pool sob carga; estouro → 504).
+  # Override por env GATEWAY_GRPC_DEADLINE_MS. Ver grpc/DeadlineClientInterceptor.
+  grpc:
+    deadline-ms: ${GATEWAY_GRPC_DEADLINE_MS:2000}
+  # Rate limiting por usuário (exigência do enunciado). Token bucket em memória por instância.
+  # `enabled` é toggle de runtime: a bateria k6 (pool de 3 usuários) DESLIGA via
+  # GATEWAY_RATELIMIT_ENABLED=false para não medir o limitador em vez da aplicação (ver loadtest/).
+  ratelimit:
+    enabled: ${GATEWAY_RATELIMIT_ENABLED:true}
+    capacity: ${GATEWAY_RATELIMIT_CAPACITY:50}
+    refill-per-second: ${GATEWAY_RATELIMIT_REFILL:25}
 
 # Único serviço publicado (REST/HTTP).
 server:

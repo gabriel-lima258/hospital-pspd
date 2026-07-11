@@ -17,6 +17,18 @@ dependencies {
 
     // gRPC CLIENT (net.devh) — injeta stubs p/ Authorization/PatientData/DataTransform.
     implementation 'net.devh:grpc-client-spring-boot-starter:3.1.0.RELEASE'
+
+    // Logging estruturado em JSON (stdout) — base da auditoria e pronto p/ Loki/Promtail.
+    // Spring Boot 3.3 não tem structured logging nativo (só 3.4+), daí o encoder do logstash.
+    implementation 'net.logstash.logback:logstash-logback-encoder:7.4'
+
+    // Testes de unidade (JUnit 5 puro — sem Spring). Versões pelo Spring BOM.
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+test {
+    useJUnitPlatform()
 }
 
 bootJar {

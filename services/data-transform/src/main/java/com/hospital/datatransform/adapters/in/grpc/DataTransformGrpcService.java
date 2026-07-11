@@ -1,5 +1,8 @@
 package com.hospital.datatransform.adapters.in.grpc;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hospital.datatransform.domain.FhirTransformer;
 
@@ -16,6 +19,8 @@ import net.devh.boot.grpc.server.service.GrpcService;
  */
 @GrpcService
 public class DataTransformGrpcService extends DataTransformGrpc.DataTransformImplBase {
+
+    private static final Logger log = LoggerFactory.getLogger(DataTransformGrpcService.class);
 
     private final FhirTransformer transformer;
 
@@ -35,7 +40,11 @@ public class DataTransformGrpcService extends DataTransformGrpc.DataTransformImp
             responseObserver.onError(Status.INVALID_ARGUMENT
                     .withDescription(e.getMessage()).withCause(e).asRuntimeException());
         } catch (Exception e) {
-            responseObserver.onError(e);
+            // Falha inesperada: loga com stack (server-side, correlacionável por trace_id) e devolve
+            // INTERNAL genérico — nunca a exceção crua, que vazaria detalhe interno ao cliente.
+            log.error("falha inesperada em toFhir", e);
+            responseObserver.onError(Status.INTERNAL
+                    .withDescription("erro interno").asRuntimeException());
         }
     }
 }

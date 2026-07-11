@@ -31,7 +31,7 @@ Aplicação de microsserviços que expõe dados clínicos no padrão **HL7/FHIR*
 
 ## Stack
 
-Java 21 · Spring Boot (hexagonal) · **Gradle** (wrapper `./gradlew`) · gRPC (`net.devh:grpc-spring-boot-starter`) · Spring Data JPA · Spring Security OAuth2 Resource Server (só no Gateway) · Micrometer + Actuator (`/actuator/prometheus`). Cluster: **kind** (1 control-plane + 3 workers). Observabilidade: **Prometheus + Grafana** (`kube-prometheus-stack`). Carga: **k6**. Tracing (ponto extra): **OpenTelemetry + Tempo**.
+Java 21 · Spring Boot (hexagonal) · **Gradle** (wrapper `./gradlew`) · gRPC (`net.devh:grpc-spring-boot-starter`) · Spring Data JPA · Spring Security OAuth2 Resource Server (só no Gateway) · Micrometer + Actuator (`/actuator/prometheus`). Cluster: **kind** (1 control-plane + 3 workers). Observabilidade: **Prometheus + Grafana** (`kube-prometheus-stack`); logs agregados (ponto extra): **Loki + Promtail** (`make loki`). Carga: **k6**. Tracing (ponto extra): **OpenTelemetry + Tempo**.
 
 ## Layout do repo
 
@@ -40,7 +40,7 @@ proto/            # contrato gRPC (fonte da verdade) — módulo Gradle :proto
 db/               # schema.sql + seed.py
 services/         # api-gateway, authorization, patient-data, data-transform
 frontend/         # React/Next
-k8s/              # Deployments, Services, HPA, observability/
+k8s/              # base/ (Deployments, Services, headless) · hpa/ · observability/ · jobs/
 loadtest/         # k6/, run-load-tests.sh, plot.py
 keycloak/         # realm-export.json
 docs/             # roteiro, prompts.md, evidencias/
@@ -48,12 +48,20 @@ docs/             # roteiro, prompts.md, evidencias/
 
 ## Comandos
 
-- `make up` — sobe tudo local (docker-compose) para o *inner loop* rápido.
+- `make up` / `make rebuild` — sobe tudo local (docker-compose); `rebuild` recompila as imagens.
 - `make cluster` — cria kind 1+3 + metrics-server + kube-prometheus-stack.
 - `make seed` — popula o banco no volume-alvo (`seed=42`, reprodutível).
-- `make deploy` — build das imagens + `kind load` + aplica `k8s/`.
-- `make load SCENARIO=1replica|3replicas|hpa` — bateria k6 (10/50/100/500/1000 VUs).
-- `make demo` — reproduz o esqueleto ambulante do zero.
+- `make deploy` — build das imagens + `kind load` + aplica `k8s/base` e `k8s/observability` (**não** o HPA). Inclui o **postgres-exporter** (métricas `pg_stat_*` do banco → dashboard, §7.1).
+- `make scale N=3` · `make pods-wide` — fixa réplicas · distribuição dos pods entre workers.
+- `make watch-hpa SCENARIO=hpa` — série temporal de réplicas/CPU → CSV (rodar em background na rampa).
+- `make grpc-lb-on|off` — headless+`round_robin` (default) × ClusterIP+`pick_first` (o "antes" do §7.3).
+- `make hpa-on|off` — aplica/remove `k8s/hpa/` (min 1 / max 10 / CPU 60%). `hpa-off` não reseta réplicas.
+- `make load SCENARIO=1replica|3replicas-off|3replicas-on|hpa` — bateria k6 (10/50/100/500/1000 VUs): prepara o estado do cluster, port-forward efêmero, warm-up+3min+cool-down por nível, summary→`loadtest/out/`. **Falta rodar/medir (Trilha D).**
+- `make plot` — summaries do k6 → `docs/evidencias/resultados.csv` + PNGs (throughput/p95/1v3). Não depende do Prometheus.
+- `make loki` — **(bônus)** Loki + Promtail na namespace `monitoring`; datasource auto-registrado no Grafana do kps. Agrega os logs JSON do Gateway; consulta LogQL `{namespace="default"} | json | nivel="FULL"`.
+- `make dashboard` — importa o dashboard **RED/USE** (`k8s/observability/dashboards/red-use.json`) no Grafana do kps via ConfigMap (sidecar). RED do Gateway + USE por pod + pods/HPA + saturação HikariCP.
+- `make tracing` / `make tracing-off` — **(bônus)** liga/desliga o **tracing** (Tempo + OTel Java agent, já embutido nas imagens, inerte por default). `tracing` sobe o Tempo, registra o datasource e ativa o export nos 4 serviços → trace `REST→gRPC→gRPC→SQL` no Grafana, com salto trace→log via `trace_id`. As baterias k6 desligam o tracing (não contamina).
+- `make demo` — deploy + seed enxuto + smoke das 3 jornadas; `DEMO_FRESH=1` recria o cluster.
 - `./gradlew build` — compila, testa e gera os stubs proto.
 
 ## Convenções
@@ -71,9 +79,12 @@ docs/             # roteiro, prompts.md, evidencias/
 
 - ❌ Teste de carga com banco vazio → semeie volume **antes** (`make seed`).
 - ❌ Deployment sem `resources.requests.cpu` → **o HPA não funciona** (reporta `<unknown>`).
-- ❌ gRPC sobre Service ClusterIP sem `round_robin` → não balanceia entre réplicas (use Service *headless* + `defaultLoadBalancingPolicy: round_robin`).
+- ❌ Deployment **com** `replicas:` declarado + HPA → todo `kubectl apply` reseta a escala no meio da medição. Omita o campo.
+- ❌ gRPC sobre Service **ClusterIP** → não balanceia entre réplicas. A causa é o DNS devolver 1 IP virtual (o `round_robin` já é default no `net.devh` 3.1.0 e não tem sobre o que rodar); o HTTP/2 multiplexa tudo numa conexão só. Fix: Service **headless** (`clusterIP: None`) — `k8s/base/grpc-headless.yaml`.
 - ❌ Keycloak no caminho do teste de carga → gere **JWTs antes** (pool `tokens.json`, TTL longo).
 - ❌ Rodar o k6 na mesma máquina saturada pelo cluster → o cliente vira o gargalo.
+- ❌ Chamada gRPC **sem deadline** → downstream travado prende a thread; sob carga = exaustão do pool. Há deadline global de 2s (`DeadlineClientInterceptor`, `gateway.grpc.deadline-ms`) → estouro vira 504.
+- ❌ `responseObserver.onError(e)` com a exceção **crua** → vaza stack/mensagem interna e vira UNKNOWN. Padrão: `log.error(..., e)` + `Status.INTERNAL.withDescription("erro interno")` (502 genérico). Erros de contrato usam código específico (NOT_FOUND/INVALID_ARGUMENT).
 
 ## Fases e portões (Definition of Done)
 

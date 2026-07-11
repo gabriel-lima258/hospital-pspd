@@ -44,11 +44,9 @@ Frontend (React/Next)
 | `ESTAGIARIO`  | `PARTIAL`                 | apenas pacientes supervisionados (dados parciais/anonimizados) |
 | `PESQUISADOR` | `ANONYMIZED`/`AGGREGATED` | apenas projetos Aprovados e vigentes                           |
 
-A **decisão** (ALLOW/DENY + nível) já está implementada no `authorization` (domínio puro
-`AuthorizationPolicy` + testes) — ver [`docs/contratos.md`](docs/contratos.md). ⚠️ **Dívida técnica
-(P3):** a **enforcement** (anonimização/agregação real no `data-transform`) ainda não existe — hoje o
-nível é decidido corretamente mas os dados voltam sempre `FULL`. Um `ESTAGIARIO` recebe `PARTIAL` e vê
-dados completos até o P3 fechar.
+A **decisão** (ALLOW/DENY + nível) mora no `authorization` (domínio puro `AuthorizationPolicy` +
+testes) e a **enforcement** no `data-transform` (`PatientAnonymizer`, `FhirTransformer`) — o nível
+autorizado decide a forma da saída, não é anotação. Ver [`docs/contratos.md`](docs/contratos.md).
 
 
 ---
@@ -60,8 +58,8 @@ dados completos até o P3 fechar.
 Java 21 · Spring Boot (hexagonal) · **Gradle** (wrapper `./gradlew`) · gRPC
 (`net.devh:grpc-spring-boot-starter`) · Spring Data JPA · Spring Security OAuth2 (só no Gateway) ·
 Micrometer + Actuator (`/actuator/prometheus`) · **Keycloak** (OAuth2/OIDC) · **PostgreSQL 16**.
-Cluster: **kind** · Observabilidade: **Prometheus + Grafana** · Carga: **k6** · Tracing (extra):
-OpenTelemetry + Tempo.
+Cluster: **kind** · Observabilidade: **Prometheus + Grafana** · Logs agregados (extra): **Loki +
+Promtail** (`make loki`) · Carga: **k6** · Tracing (extra): OpenTelemetry + Tempo.
 
 ---
 
@@ -82,13 +80,13 @@ OpenTelemetry + Tempo.
 
 ```
 proto/            # contrato gRPC (fonte da verdade) — módulo Gradle :proto
-db/               # schema.sql (+ seed.py, futuro)
+db/               # schema.sql · seed.py · seed-min.sql
 services/         # api-gateway · authorization · patient-data · data-transform
 frontend/         # React/Next (futuro)
-k8s/              # base/ + observability/ (manifests, HPA, ServiceMonitors)
-loadtest/         # k6/, run-load-tests.sh, plot.py (futuro)
-keycloak/         # realm-export.json (futuro)
-docs/             # roteiro, contratos, prompts, evidências
+k8s/              # base/ (Deployments, Services, headless) · hpa/ · observability/ · jobs/
+loadtest/         # k6/scenario.js, gen-tokens.sh, run-load-tests.sh, collect-metrics.sh, plot.py
+keycloak/         # realm-export.json + get-token.sh
+docs/             # roteiro, contratos, CHECKLIST, evidências
 ```
 
 Layout **hexagonal** por serviço: `domain/` (regras, sem framework) · `application/` (casos de uso) ·
@@ -137,21 +135,40 @@ falam entre si pela rede do compose (gRPC em `:9090`, HTTP/actuator em `:8080`).
 
 
 
-### Requisição de exemplo (esqueleto ambulante, M1)
+### As 3 jornadas (M2)
 
-`GET /fhir/Patient/{id}` atravessa Gateway → Authorization → Patient Data → Postgres → Data Transform:
+Toda requisição atravessa Gateway → Authorization → Patient Data → Postgres → Data Transform.
+O **nível autorizado decide a forma da saída** — não é anotação, é enforcement.
+
+**1 e 2 — prontuário individual** (`GET /fhir/Patient/{id}`):
 
 ```bash
 TOKEN=$(keycloak/get-token.sh med.cardoso)
 curl -H "Authorization: Bearer $TOKEN" http://localhost:9000/fhir/Patient/P000001 | jq
 # → Bundle FHIR (Patient + Encounter/Condition/Observation/MedicationRequest), mascarado pelo nível:
-#   MEDICO (FULL)     → {"resourceType":"Patient","id":"P000001","name":[{"text":"Joao da Silva"}],"identifier":[CPF,CNS],...}
-#   ESTAGIARIO (PARTIAL) → {"resourceType":"Patient","name":[{"text":"J. da S."}],"birthDate":"1980"}  (sem CPF/CNS)
+#   MEDICO (FULL)        → name:"Joao da Silva", birthDate:"1980-05-12", identifier:[CPF, CNS]
+#   ESTAGIARIO (PARTIAL) → name:"J. da S.",      birthDate:"1980",       sem identifier
 
 # Caso negativo (médico sem vínculo) → HTTP 403:
 TOKEN=$(keycloak/get-token.sh med.semvinculo)
 curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $TOKEN" \
   http://localhost:9000/fhir/Patient/P000001
+```
+
+**3 — coorte de pesquisa** (`GET /fhir/cohort/{projetoId}?tipo=…`). O cliente escolhe o **projeto**;
+a **coorte** é resolvida pelo Authorization a partir do projeto validado, nunca por parâmetro:
+
+```bash
+TOKEN=$(keycloak/get-token.sh pesq.souza)
+curl -H "Authorization: Bearer $TOKEN" \
+  'http://localhost:9000/fhir/cohort/PRJ01?tipo=ResumoCoorte' | jq
+# → MeasureReport (AGGREGATED): total 8952, %sexo/faixa/setor, mediaHbA1c — zero dado individual
+
+curl -H "Authorization: Bearer $TOKEN" \
+  'http://localhost:9000/fhir/cohort/PRJ01?tipo=ExamesCoorte' | jq
+# → Bundle (ANONYMIZED): Patients pseudonimizados ("hash…"), datas truncadas ao ano
+
+# PRJ02 (Expirado) e PRJ04 (de outro dono) → 403 · PRJ03 (coorte vazia) → 404 · tipo inválido → 400
 ```
 
 
@@ -202,17 +219,54 @@ Detalhes dos claims em `[docs/contratos.md](docs/contratos.md)`. Para recriar o 
 | Comando                                     | O que faz                                                                                       | Status   |
 | ------------------------------------------- | ----------------------------------------------------------------------------------------------- | -------- |
 | `make up`                                   | Sobe Postgres + Keycloak + os 4 serviços (reusa imagens)                                        | ✅        |
+| `make rebuild`                              | Recompila as imagens do compose e sobe (use após mexer em `services/**`)                        | ✅        |
 | `make down`                                 | Derruba o ambiente local (derruba o volume)                                                     | ✅        |
 | `make logs`                                 | Segue os logs do ambiente local                                                                 | ✅        |
 | `make cluster`                              | Cria kind (1 control-plane + 3 workers) + metrics-server + kube-prometheus-stack                | ✅        |
 | `make cluster-down`                         | Deleta o cluster kind (`pspd`)                                                                  | ✅        |
 | `make grafana`                              | Port-forward do Grafana em [http://localhost:3000](http://localhost:3000) (imprime user admin + senha do secret) | ✅        |
+| `make loki`                                 | **(bônus)** Loki + Promtail: agrega os logs JSON no Grafana; LogQL `\| json \| nivel="FULL"`    | ✅        |
+| `make dashboard`                            | Importa o dashboard **RED/USE** no Grafana do kps (fase e da observabilidade)                   | ✅        |
+| `make tracing` / `tracing-off`              | **(bônus)** Tempo + OTel agent: liga/desliga traces `REST→gRPC→SQL` no Grafana (trace→log)      | ✅        |
 | `make seed`                                 | Semeia o **cluster** via Job k8s (`SCALE=50000`, `seed=42`, `COPY`) — ~50k pacientes, ~1–2M eventos | ✅        |
 | `make seed-local`                           | Semeia o banco do **compose** (`localhost:5433`) via venv Python. `SCALE=` ajusta o volume     | ✅        |
 | `make deploy`                               | Build das imagens + `kind load` + aplica `k8s/`                                                 | 🚧 D2/D5 |
-| `make load SCENARIO=1replica|3replicas|hpa` | Bateria k6 (10/50/100/500/1000 VUs) + geração de CSV/plots                                    | ✅ D4/D5 |
+| `make scale N=3`                            | Fixa as réplicas dos 4 serviços e espera todas ficarem Ready                                    | ✅        |
+| `make pods-wide`                            | `kubectl get pods -o wide` — distribuição dos pods entre os workers                             | ✅        |
+| `make watch-hpa SCENARIO=hpa`               | Amostra réplicas/CPU dos 4 serviços num CSV. Rode **em background** durante a rampa do k6        | ✅        |
+| `make grpc-lb-on`                           | gRPC balanceado: Service headless + `round_robin` (é o default)                                 | ✅        |
+| `make grpc-lb-off`                          | gRPC pinado em 1 pod: ClusterIP + `pick_first` — o "antes" do §7.3                              | ✅        |
+| `make hpa-on` / `make hpa-off`              | Aplica/remove o HPA (`k8s/hpa/`, min 1 / max 10 / CPU 60%)                                      | ✅        |
 | `make demo`                                 | Reproduz o esqueleto ambulante do zero                                                          | 🚧 D2    |
+| `make load SCENARIO=1replica|3replicas|hpa` | Bateria k6 (10/50/100/500/1000 VUs) + geração de CSV/plots                                    | ✅ D4/D5 |
+| `make plot`                                 | Summaries do k6 → `docs/evidencias/resultados.csv` + PNGs                                       | ✅        |
+>>>>>>> main
 | `make help`                                 | Lista os alvos                                                                                  | ✅        |
+
+
+### Cenários de teste (interface entre Trilha A e Trilha D)
+
+O `loadtest/run-load-tests.sh` prepara o cluster com estes alvos antes de cada bateria k6:
+
+
+| Cenário                        | Comandos                                                     |
+| ------------------------------ | ------------------------------------------------------------ |
+| `1replica`                     | `make hpa-off && make scale N=1`                             |
+| `3replicas` (§7.3 **antes**)   | `make grpc-lb-off && make hpa-off && make scale N=3`         |
+| `3replicas` (§7.3 **depois**)  | `make grpc-lb-on && make hpa-off && make scale N=3`          |
+| `hpa`                          | `make grpc-lb-on && make scale N=1 && make hpa-on`           |
+
+
+⚠️ Não rode `kubectl apply -f k8s/base` no meio de um cenário — recria o estado. E `make hpa-off`
+**não** reseta a contagem de réplicas: sempre siga de `make scale N=`.
+
+> **Por que `grpc-lb-off` existe.** Um `Service` ClusterIP resolve para **um** IP virtual. O cliente
+> gRPC abre **uma** conexão HTTP/2 de longa duração e multiplexa tudo nela; o `kube-proxy` balanceia
+> conexões, não requisições. Com 3 réplicas, **1 pod recebe ~100% da carga**. O
+> `defaultLoadBalancingPolicy: round_robin` (já é o default do `net.devh` 3.1.0) não resolve — ele
+> faz round-robin sobre a lista devolvida pelo DNS, e essa lista tem 1 elemento. O fix é o **Service
+> headless** (`clusterIP: None`), em `k8s/base/grpc-headless.yaml`. `grpc-lb-off` reproduz o arranjo
+> quebrado para que a descoberta §7.3 tenha um "antes" medido.
 
 
 Gradle:
@@ -239,17 +293,27 @@ Gradle:
 
 
 
-## Estado atual (Dia 1 — Fundação)
+## Estado atual
 
-- ✅ Estrutura do repo + Gradle multi-project (`:proto` + 4 serviços) com wrapper.
-- ✅ 3 contratos congelados; `:proto` gerando stubs Java + gRPC.
-- ✅ `docker-compose.yml` (Postgres 16 + Keycloak) e `Makefile`.
-- 🚧 Serviços ainda são **placeholders** (sem lógica) — próximo: scaffold Spring Boot (P-scaffold),
-Keycloak realm (P-keycloak) e o **esqueleto ambulante** (D2, milestone M1).
+- ✅ **M1a/M1** — fundação, cluster kind 1+3, esqueleto ambulante ponta-a-ponta com métrica no Grafana.
+- ✅ **M2** — validação funcional: seed de volume (50k pacientes, ~1,39M eventos), decisão de acesso
+  testada e as **3 jornadas REST** (médico/FULL, estagiário/PARTIAL, pesquisador/AGGREGATED+ANONYMIZED).
+- ✅ **Infra de escala** — Service headless + `round_robin`, HPA (min 1 / max 10 / CPU 60%), toggles
+  no `Makefile`. Falta **medir**.
+- ✅ **Gateway maduro** — rate limiting por usuário (429), logging estruturado JSON (auditoria),
+  erro gRPC→HTTP global (404/400/…). Harness k6 (`make load`/`make plot`) pronto.
+- ✅ **Resiliência** — deadline gRPC default 2s (protege o thread pool sob carga → 504); erros
+  internos não vazam (`INTERNAL` genérico + `log.error` com `trace_id`); logs JSON nos 4 serviços.
+- ✅ **Logs agregados (bônus)** — Loki + Promtail (`make loki`); LogQL no Grafana sobre o JSON.
+- ✅ **Tracing distribuído (bônus)** — OTel agent + Tempo (`make tracing`); trace `REST→gRPC→SQL`
+  com salto trace→log por `trace_id`. Fecha o triângulo métricas+logs+traces no mesmo Grafana.
+- ✅ **Métricas do banco (bônus)** — `postgres-exporter` (`k8s/observability/`, via `make deploy`):
+  `pg_stat_*` no dashboard (tps, conexões, cache hit) → prova o gargalo do Postgres (§7.1).
+- 🚧 **M3/M4** — dashboards RED/USE, baterias k6 (10/50/100/500/1000 VUs), escalabilidade e HPA.
+  Falta **medir** (rodar o k6) e o dashboard: é onde estão os **80% da nota**.
 
-Roadmap por dia (D1→D7) e Definition of Done: ver `[CLAUDE.md](CLAUDE.md)` e o
-[roteiro](docs/Roteiro_PSPD_Observabilidade_K8S.md). Prompts prontos por tarefa em
-`[docs/prompts.md](docs/prompts.md)`.
+Placar completo, donos por trilha e portões: **`[docs/CHECKLIST.md](docs/CHECKLIST.md)`**. Detalhe
+técnico: [roteiro](docs/Roteiro_PSPD_Observabilidade_K8S.md).
 
 ---
 

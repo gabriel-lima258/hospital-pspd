@@ -5,6 +5,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.EmptyResultDataAccessException;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hospital.patientdata.adapters.out.jpa.PatientRepository;
 import com.hospital.patientdata.domain.Percentages;
@@ -12,6 +16,7 @@ import com.hospital.patientdata.domain.Percentages;
 import hospital.ClinicalData;
 import hospital.PatientDataGrpc;
 import hospital.PatientQuery;
+import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import net.devh.boot.grpc.server.service.GrpcService;
 
@@ -25,6 +30,8 @@ import net.devh.boot.grpc.server.service.GrpcService;
  */
 @GrpcService
 public class PatientDataGrpcService extends PatientDataGrpc.PatientDataImplBase {
+
+    private static final Logger log = LoggerFactory.getLogger(PatientDataGrpcService.class);
 
     /** Gêneros do seed; ordem fixa para que a chave apareça mesmo com contagem zero. */
     private static final List<String> ORDEM_SEXO = List.of("male", "female", "other");
@@ -56,8 +63,17 @@ public class PatientDataGrpcService extends PatientDataGrpc.PatientDataImplBase 
             String json = objectMapper.writeValueAsString(payload);
             responseObserver.onNext(ClinicalData.newBuilder().setJsonPayload(json).build());
             responseObserver.onCompleted();
+        } catch (EmptyResultDataAccessException e) {
+            // Paciente inexistente: queryForMap não achou linha. Sinaliza NOT_FOUND para o gateway
+            // traduzir em 404 — sem isso a exceção vaza como UNKNOWN e vira 500 genérico.
+            responseObserver.onError(Status.NOT_FOUND
+                    .withDescription("recurso não encontrado").asRuntimeException());
         } catch (Exception e) {
-            responseObserver.onError(e);
+            // Falha inesperada (ex.: erro de SQL/conexão): loga com stack e devolve INTERNAL genérico
+            // — nunca a exceção crua, que vazaria detalhe interno ao cliente.
+            log.error("falha inesperada em fetch (tipo={})", request.getTipoConsulta(), e);
+            responseObserver.onError(Status.INTERNAL
+                    .withDescription("erro interno").asRuntimeException());
         }
     }
 

@@ -1,0 +1,71 @@
+# HPA — fase (d) do enunciado (§3.d: min 1 / max 10, escala por CPU, demonstrar criação
+# automática de pods, redistribuição de carga, redução de latência e limite de escalabilidade).
+#
+# Este diretório fica FORA do `kubectl apply -f k8s/base` do `make deploy` de propósito: nos
+# cenários de réplica fixa (1replica, 3replicas) um HPA ativo re-escalaria no meio da bateria
+# e contaminaria o número. Liga-se explicitamente com `make hpa-on`, desliga com `make hpa-off`.
+#
+# Pré-requisito: metrics-server (instalado por `make cluster`) e `resources.requests.cpu` nos
+# Deployments. Sem requests, `kubectl get hpa` reporta `<unknown>/60%` e a fase (d) não roda.
+#
+# `behavior`: scaleUp agressivo (até 2 pods a cada 30s) para o escalonamento ficar visível no
+# `kubectl get hpa -w` durante a demo; scaleDown lento (120s) para não oscilar entre rampas.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: api-gateway
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: api-gateway }
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource: { name: cpu, target: { type: Utilization, averageUtilization: 60 } }
+  behavior:
+    scaleUp:   { stabilizationWindowSeconds: 30, policies: [ { type: Pods, value: 2, periodSeconds: 30 } ] }
+    scaleDown: { stabilizationWindowSeconds: 120 }
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: authorization
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: authorization }
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource: { name: cpu, target: { type: Utilization, averageUtilization: 60 } }
+  behavior:
+    scaleUp:   { stabilizationWindowSeconds: 30, policies: [ { type: Pods, value: 2, periodSeconds: 30 } ] }
+    scaleDown: { stabilizationWindowSeconds: 120 }
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: patient-data
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: patient-data }
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource: { name: cpu, target: { type: Utilization, averageUtilization: 60 } }
+  behavior:
+    scaleUp:   { stabilizationWindowSeconds: 30, policies: [ { type: Pods, value: 2, periodSeconds: 30 } ] }
+    scaleDown: { stabilizationWindowSeconds: 120 }
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: data-transform
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: data-transform }
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource: { name: cpu, target: { type: Utilization, averageUtilization: 60 } }
+  behavior:
+    scaleUp:   { stabilizationWindowSeconds: 30, policies: [ { type: Pods, value: 2, periodSeconds: 30 } ] }
+    scaleDown: { stabilizationWindowSeconds: 120 }

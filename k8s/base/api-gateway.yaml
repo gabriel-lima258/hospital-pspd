@@ -5,17 +5,39 @@ metadata:
   name: api-gateway
   labels: { app: api-gateway }
 spec:
-  replicas: 1
+  # `replicas` omitido de propósito: quem manda na contagem é `kubectl scale` (fase c) ou o HPA
+  # (fase d). Declarado aqui, todo `kubectl apply` resetaria a escala no meio de uma medição.
   selector:
     matchLabels: { app: api-gateway }
   template:
     metadata:
       labels: { app: api-gateway }
     spec:
+      # Espalha as réplicas pelos 3 workers — o enunciado §3(c) pede "a distribuição dos pods do
+      # K8S". O default do scheduler é maxSkew:3, que permitiria 3 réplicas caírem 2/1/0.
+      # `ScheduleAnyway` (soft) e não `DoNotSchedule`: com o HPA indo a 10 réplicas, um constraint
+      # duro deixaria pods em Pending ao lotar o nó — e Pending sob carga contamina a fase (d).
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels: { app: api-gateway }
       containers:
         - name: api-gateway
           image: hospital/api-gateway:dev
           imagePullPolicy: IfNotPresent
+          env:
+            # TTL do cache de DNS da JVM. Sem isso, o gateway leva ~30s para enxergar um pod
+            # novo criado pelo HPA no registro A do Service headless.
+            # ARMADILHA: `networkaddress.cache.ttl` é security property (java.security) e NÃO é
+            # lida via -D. A equivalente que funciona via -D é `sun.net.inetaddr.ttl`.
+            # A defasagem que sobra (EndpointSlice → registro A → re-resolução do grpc-java) é
+            # justamente o que a descoberta §7.2 mede — reduzir, não zerar.
+            - name: JAVA_TOOL_OPTIONS
+              value: "-Dsun.net.inetaddr.ttl=5 -Dsun.net.inetaddr.negative.ttl=0"
+          # As envs GRPC_*_ADDRESS / GRPC_LB_POLICY NÃO são declaradas aqui de propósito: assim
+          # `kubectl apply` não as gerencia e o valor posto por `make grpc-lb-off` sobrevive.
           ports:
             - { containerPort: 9000, name: http }
           readinessProbe:
