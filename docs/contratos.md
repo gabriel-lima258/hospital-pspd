@@ -50,18 +50,48 @@ A regra vive no domínio puro `AuthorizationPolicy` (testável sem Spring/DB). D
 | outra / ausente | — | `DENY` |
 
 **`tipo_consulta` — vocabulário único, atravessa os 3 serviços.** Definido aqui; os três o consomem
-com as **mesmas strings** (`AuthorizationPolicy.nivelPesquisador`, `PatientDataGrpcService.fetch`,
+com as **mesmas strings** (`AuthorizationPolicy`, `PatientDataGrpcService.fetch`,
 `FhirTransformer.transform`). Não inventar valores novos.
 
-| `tipo_consulta` | Nível (Authorization) | Patient Data | Saída (Data Transform) |
-|---|---|---|---|
-| `Patient` | `FULL` / `PARTIAL` | prontuário individual | `Bundle` |
-| `ExamesCoorte` | `ANONYMIZED` | amostra de 100 da coorte | `Bundle` pseudonimizado |
-| `ResumoCoorte`, `Estatisticas` | `AGGREGATED` | agregação da coorte | `MeasureReport` |
-| _(qualquer outro / vazio)_ | `AGGREGATED` | — | **default seguro** (nunca ANONYMIZED sem pedido explícito) |
+As **consultas nomeadas do enunciado** (§2.1 + footnote ²) são o vocabulário completo:
 
-O gateway valida `?tipo=` contra `{ResumoCoorte, Estatisticas, ExamesCoorte}` e devolve **400** fora
-disso, então o default seguro é defesa em profundidade, não caminho normal.
+| `tipo_consulta` | Perfil | Nível (Authorization) | Patient Data | Saída (Data Transform) |
+|---|---|---|---|---|
+| `ResumoClinico` | MEDICO/ESTAGIARIO | `FULL` / `PARTIAL` | snapshot: diagnósticos + último atendimento + últimos exames + meds em uso | `Bundle` |
+| `HistoricoClinico` | MEDICO/ESTAGIARIO | `FULL` / `PARTIAL` | prontuário temporal completo | `Bundle` |
+| `Exames` | MEDICO/ESTAGIARIO | `FULL` / `PARTIAL` | só observações | `Bundle` (Patient + Observation) |
+| `Medicamentos` | MEDICO/ESTAGIARIO | `FULL` / `PARTIAL` | só medicações | `Bundle` (Patient + MedicationRequest) |
+| `ListaPacientes` | MEDICO/ESTAGIARIO | `FULL` / `PARTIAL` | pacientes do cuidador (por `username_cuidador`) | `Bundle` `searchset` de Patient |
+| `Patient` (legado) | MEDICO/ESTAGIARIO | `FULL` / `PARTIAL` | = `HistoricoClinico` | `Bundle` |
+| `ExamesCoorte` | PESQUISADOR | `ANONYMIZED` | amostra de 100 da coorte | `Bundle` pseudonimizado |
+| `ResumoCoorte`, `Estatisticas` | PESQUISADOR | `AGGREGATED` | agregação da coorte | `MeasureReport` |
+| `ListaProjetos` | PESQUISADOR | `FULL` (não usado) | projetos do dono (por `username_pesquisador`) | **JSON puro** (não passa pelo Data Transform) |
+| _(qualquer outro / vazio no caminho de coorte)_ | PESQUISADOR | `AGGREGATED` | — | **default seguro** (nunca ANONYMIZED sem pedido explícito) |
+
+**Nota de fatia × nível.** As consultas individuais nomeadas (`Resumo/Historico/Exames/Medicamentos`)
+mudam só a **fatia** dos dados; o **nível** continua vindo da role (FULL médico / PARTIAL estagiário).
+O Patient Data fatia o payload; o Data Transform monta o `Bundle` apenas com os recursos presentes,
+então Exames/Medicamentos/Resumo reusam o mesmo caminho de montagem individual.
+
+**Definição operacional (ResumoClinico).** Como o schema não tem flag de "ativo", "medicamentos em
+uso"/"últimos exames" = evento **mais recente por `codigo_tipo`**; "último atendimento" = encounter
+mais recente; "diagnósticos principais" = todas as Conditions do paciente.
+
+**Listas — escopo por dono.** `ListaPacientes` e `ListaProjetos` não recebem alvo do cliente: o
+`username` do JWT é repassado em `PatientQuery.username` e o filtro (`username_cuidador` /
+`username_pesquisador`) acontece no Patient Data — um cuidador nunca lista pacientes de outro, um
+pesquisador nunca vê projetos de outro. A autorização libera pela **role** (a lista é escopada, não
+depende de vínculo/projeto específico); cross-role (ex.: médico pedindo `ListaProjetos`) → DENY.
+
+**Validação de `?tipo=` no Gateway.** A rota individual valida `?tipo=` contra
+`{ResumoClinico, HistoricoClinico, Exames, Medicamentos}` (default `HistoricoClinico`), a de coorte
+contra `{ResumoCoorte, Estatisticas, ExamesCoorte}`; fora disso → **400**. O default seguro é defesa
+em profundidade, não caminho normal.
+
+**Projetos = JSON, de propósito.** A tabela tabela→FHIR do enunciado (§2.1) só mapeia dados clínicos
+do paciente; `projects` não tem recurso FHIR. `ListaProjetos` é metadado administrativo → devolvido
+como JSON puro na rota `GET /projects` (fora de `/fhir`), sem anonimização. Decisão registrada aqui e
+no relatório.
 
 ### Resolução da coorte (D3/P3c) — o `coorte_codigo` nasce no servidor
 
@@ -76,6 +106,18 @@ O Authorization, que já lê `projects` para checar dono + status + vigência, d
 Erros da rota de coorte: DENY → **403**; `tipo` inválido/ausente → **400**; coorte vazia → **404**;
 falha gRPC → **502**. Ver `docs/evidencias/pesquisador-coorte.md`. (Esta rota mapeia localmente, no
 próprio `try/catch`.)
+
+### Rotas REST do Gateway (visão completa)
+
+| Rota | Perfil | Consulta(s) | Saída |
+|---|---|---|---|
+| `GET /fhir/Patient/{id}?tipo=…` | médico/estagiário | `ResumoClinico`\|`HistoricoClinico`\|`Exames`\|`Medicamentos` (default `HistoricoClinico`) | `Bundle` (mascarado por nível) |
+| `GET /fhir/Patient` | médico/estagiário | `ListaPacientes` (pacientes do cuidador) | `Bundle` `searchset` de Patient |
+| `GET /fhir/cohort/{projetoId}?tipo=…` | pesquisador | `ResumoCoorte`\|`Estatisticas`\|`ExamesCoorte` | `MeasureReport` \| `Bundle` pseudonimizado |
+| `GET /projects` | pesquisador | `ListaProjetos` (projetos do dono + status) | **JSON** (não-FHIR, admin) |
+
+Todas exigem `Authorization: Bearer <JWT>`; DENY → **403**. `GET /fhir/Patient/{id}` inexistente →
+**404** (`GrpcHttpExceptionHandler`). `?tipo=` inválido → **400**.
 
 **Mapa gRPC→HTTP global** (`GrpcHttpExceptionHandler`, `@RestControllerAdvice`) — cobre as rotas
 **sem** `catch` local, hoje a de prontuário `GET /fhir/Patient/{id}`. Traduz o código do
@@ -173,8 +215,10 @@ package `hospital`). Três serviços:
 
 - `Authorization.Check(AuthzRequest) → AuthzReply` — `allow` + `nivel` (FULL/PARTIAL/ANONYMIZED/AGGREGATED)
   + `coorte_codigo` (só em ALLOW + PESQUISADOR).
-- `PatientData.Fetch(PatientQuery) → ClinicalData` — `json_payload` cru.
-- `DataTransform.ToFhir(TransformRequest) → FhirReply` — `fhir_json` (`Bundle` ou `MeasureReport`, conforme o `nivel`).
+- `PatientData.Fetch(PatientQuery) → ClinicalData` — `json_payload` cru. `PatientQuery` carrega
+  `patient_id` (individual), `coorte_codigo` (coorte), `tipo_consulta` e `username` (listas).
+- `DataTransform.ToFhir(TransformRequest) → FhirReply` — `fhir_json` (`Bundle` `collection`/`searchset`
+  ou `MeasureReport`, conforme o `nivel`/shape).
 
 Stubs Java+gRPC gerados pelo módulo `:proto` (`./gradlew :proto:build`). Os 4 serviços embutem esse
 jar ⇒ **toda mudança no proto exige `make redeploy`** (rebuild + `rollout restart` dos 4).
@@ -187,6 +231,7 @@ mesmo dia** (regra de ouro nº 2 do `CLAUDE.md`).
 | Data | Passo | Mudança | Compatibilidade |
 |---|---|---|---|
 | 2026-07-09 | **D3/P3c** | `AuthzReply` **+** `string coorte_codigo = 3` | **Aditiva.** Campo 3 estava livre; em proto3 o default é `""`. Médico e estagiário ignoram. `AuthzRequest` e `PatientQuery` **não** mudaram. |
+| 2026-07-11 | **Consultas nomeadas** | `PatientQuery` **+** `string username = 4` | **Aditiva.** Campo 4 estava livre; default `""`. Usado só nas listas (`ListaPacientes`/`ListaProjetos`); consultas individuais/coorte ignoram. Nenhum campo existente mudou. |
 
 ---
 

@@ -49,13 +49,17 @@ public class AuthorizationGrpcService extends AuthorizationGrpc.AuthorizationImp
             String role = request.getRole();
             String username = request.getUsername();
             String patientId = request.getPatientId();
+            String tipo = request.getTipoConsulta();
+            boolean listaPacientes = AuthorizationPolicy.LISTA_PACIENTES.equals(tipo);
+            boolean listaProjetos = AuthorizationPolicy.LISTA_PROJETOS.equals(tipo);
 
-            // Apura só o fato relevante ao perfil (evita hits inúteis no banco).
-            boolean medicoAtivo = "MEDICO".equals(role)
+            // Apura só o fato relevante ao perfil (evita hits inúteis no banco). As consultas de LISTA
+            // são escopadas por username no Patient Data e não dependem de vínculo/projeto específico.
+            boolean medicoAtivo = "MEDICO".equals(role) && !listaPacientes
                     && assignments.countVinculoMedicoAtivo(username, patientId) > 0;
-            boolean estagiarioAtivo = "ESTAGIARIO".equals(role)
+            boolean estagiarioAtivo = "ESTAGIARIO".equals(role) && !listaPacientes
                     && assignments.existeEstagiarioSupervisionadoAtivo(username, patientId);
-            ProjectInfo projeto = "PESQUISADOR".equals(role)
+            ProjectInfo projeto = ("PESQUISADOR".equals(role) && !listaProjetos)
                     ? projects.findDoDono(username, request.getProjetoId()).orElse(null)
                     : null;
 

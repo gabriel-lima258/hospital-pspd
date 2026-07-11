@@ -46,8 +46,12 @@ public final class FhirTransformer {
 
         Map<String, Object> fhir = switch (nivel) {
             case FULL, PARTIAL -> {
-                exigir(root.has("demographics"), nivel, "payload individual (demographics)");
-                yield bundleIndividual(root, nivel, referencia);
+                if (root.has("demographics")) {
+                    yield bundleIndividual(root, nivel, referencia);
+                }
+                exigir(root.has("listaPacientes"), nivel,
+                        "payload individual (demographics) ou lista de pacientes (listaPacientes)");
+                yield bundleSearchset(root, nivel, referencia);
             }
             case ANONYMIZED -> {
                 if (root.has("demographics")) {
@@ -106,6 +110,19 @@ public final class FhirTransformer {
             }
         }
         return recursos.bundle(entradas);
+    }
+
+    /**
+     * Bundle {@code searchset} da lista de pacientes do cuidador: um Patient por entrada, mascarado
+     * pelo nível da role (FULL mantém nome/CPF; PARTIAL vira iniciais sem CPF/CNS). Sem recursos
+     * clínicos — é só o índice de "meus pacientes".
+     */
+    private Map<String, Object> bundleSearchset(JsonNode root, Nivel nivel, LocalDate referencia) {
+        List<Map<String, Object>> entradas = new ArrayList<>();
+        for (JsonNode paciente : root.path("listaPacientes")) {
+            entradas.add(anonymizer.patient(paciente, nivel, referencia));
+        }
+        return recursos.bundle(entradas, "searchset");
     }
 
     private static void exigir(boolean condicao, Nivel nivel, String esperado) {

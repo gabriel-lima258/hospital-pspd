@@ -34,6 +34,10 @@ message PatientQuery {
   string patient_id    = 1;
   string coorte_codigo = 2;  // condição da coorte (ex.: Diabetes)
   string tipo_consulta = 3;
+  // Dono da consulta (preferred_username), usado nas consultas de LISTA que filtram por vínculo:
+  // ListaPacientes → user_patient_assignments.username_cuidador; ListaProjetos →
+  // projects.username_pesquisador. Vazio nas consultas individuais/coorte. Campo aditivo (D3+).
+  string username      = 4;
 }
 message ClinicalData {
   string json_payload = 1;   // dados clínicos crus (JSON serializado)
