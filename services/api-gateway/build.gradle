@@ -22,8 +22,10 @@ dependencies {
     // Spring Boot 3.3 não tem structured logging nativo (só 3.4+), daí o encoder do logstash.
     implementation 'net.logstash.logback:logstash-logback-encoder:7.4'
 
-    // Testes de unidade (JUnit 5 puro — sem Spring). Versões pelo Spring BOM.
+    // Testes de unidade e integração com Spring Boot.
     testImplementation 'org.junit.jupiter:junit-jupiter'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.security:spring-security-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
