@@ -185,6 +185,93 @@ class FhirTransformerTest {
         }
     }
 
+    /** Fatia "Exames" (footnote ²): só observações; demais seções vazias (o patient-data já fatiou). */
+    private static final String SO_EXAMES = """
+            {"demographics":{"id":"P000001","nome":"Joao da Silva","data_nascimento":"1980-05-12",
+              "genero":"male","cidade":"Brasilia","estado":"DF","cpf":"000.000.000-00","cns":"700000000000000"},
+             "encounters":[],"conditions":[],
+             "observations":[{"codigo_tipo":"Creatinina","valor":2.16,"unidade":"mg/dL",
+              "data":"2023-09-29T11:20:08"}],
+             "medications":[]}
+            """;
+
+    /** Fatia "Medicamentos": só medicações. */
+    private static final String SO_MEDICAMENTOS = """
+            {"demographics":{"id":"P000001","nome":"Joao da Silva","data_nascimento":"1980-05-12",
+              "genero":"male","cidade":"Brasilia","estado":"DF","cpf":"000.000.000-00","cns":"700000000000000"},
+             "encounters":[],"conditions":[],"observations":[],
+             "medications":[{"codigo_tipo":"Insulina","descricao":"Antidiabetico","data":"2023-09-05T06:30:05"}]}
+            """;
+
+    /** Shape ListaPacientes (novo): índice "meus pacientes", um bloco demográfico por entrada. */
+    private static final String LISTA = """
+            {"listaPacientes":[
+              {"id":"P000001","nome":"Joao da Silva","data_nascimento":"1980-05-12","genero":"male",
+               "cidade":"Brasilia","estado":"DF","cpf":"000.000.000-00","cns":"700000000000000"},
+              {"id":"P000002","nome":"Maria Souza","data_nascimento":"1990-02-02","genero":"female",
+               "cidade":"Goiania","estado":"GO","cpf":"111.111.111-11","cns":"700000000000001"}]}
+            """;
+
+    @Nested
+    @DisplayName("fatias individuais (Exames/Medicamentos)")
+    class Fatias {
+
+        @Test
+        @DisplayName("Exames: Bundle só com Patient + Observation")
+        void soObservacoes() throws Exception {
+            JsonNode bundle = transform(SO_EXAMES, "FULL");
+            assertThat(bundle.get("type").asText()).isEqualTo("collection");
+            assertThat(tiposDeRecurso(bundle)).containsExactly("Patient", "Observation");
+        }
+
+        @Test
+        @DisplayName("Medicamentos: Bundle só com Patient + MedicationRequest")
+        void soMedicacoes() throws Exception {
+            assertThat(tiposDeRecurso(transform(SO_MEDICAMENTOS, "FULL")))
+                    .containsExactly("Patient", "MedicationRequest");
+        }
+
+        @Test
+        @DisplayName("PARTIAL na fatia continua mascarando o Patient")
+        void fatiaPartialMascara() throws Exception {
+            JsonNode patient = transform(SO_EXAMES, "PARTIAL").get("entry").get(0).get("resource");
+            assertThat(patient.get("name").get(0).get("text").asText()).isEqualTo("J. da S.");
+            assertThat(patient.has("identifier")).isFalse();
+        }
+    }
+
+    @Nested
+    @DisplayName("lista de pacientes (searchset)")
+    class ListaPacientes {
+
+        @Test
+        @DisplayName("FULL: Bundle searchset com um Patient completo por paciente")
+        void searchsetFull() throws Exception {
+            JsonNode bundle = transform(LISTA, "FULL");
+
+            assertThat(bundle.get("type").asText()).isEqualTo("searchset");
+            assertThat(bundle.get("total").asInt()).isEqualTo(2);
+            assertThat(tiposDeRecurso(bundle)).containsExactly("Patient", "Patient");
+
+            JsonNode primeiro = bundle.get("entry").get(0).get("resource");
+            assertThat(primeiro.get("id").asText()).isEqualTo("P000001");
+            assertThat(primeiro.get("name").get(0).get("text").asText()).isEqualTo("Joao da Silva");
+            assertThat(primeiro.has("identifier")).isTrue();
+        }
+
+        @Test
+        @DisplayName("PARTIAL: cada Patient vem com iniciais e sem CPF/CNS")
+        void searchsetPartial() throws Exception {
+            JsonNode bundle = transform(LISTA, "PARTIAL");
+            JsonNode segundo = bundle.get("entry").get(1).get("resource");
+
+            assertThat(segundo.get("name").get(0).get("text").asText()).isEqualTo("M. S.");
+            assertThat(segundo.has("identifier")).isFalse();
+            assertThat(transformer.transform(LISTA, "PARTIAL", HOJE))
+                    .doesNotContain("000.000.000-00").doesNotContain("111.111.111-11");
+        }
+    }
+
     @Nested
     @DisplayName("dispatch inválido falha alto")
     class Invalido {

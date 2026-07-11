@@ -1,15 +1,11 @@
 package com.hospital.gateway.adapters.in.rest;
 
-import java.util.Set;
-
 import net.devh.boot.grpc.client.inject.GrpcClient;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import hospital.AuthorizationGrpc;
@@ -23,21 +19,16 @@ import hospital.PatientQuery;
 import hospital.TransformRequest;
 
 /**
- * Adapter de entrada REST do Gateway — prontuário individual (médico/estagiário). Orquestra a pilha
- * via gRPC: Authorization.Check → (ALLOW) PatientData.Fetch → DataTransform.ToFhir. Erros gRPC que
- * escapam daqui são traduzidos pelo {@link GrpcHttpExceptionHandler} (ex.: paciente inexistente →
- * NOT_FOUND → 404). A coorte do pesquisador tem rota própria em {@link FhirCohortController}.
+ * Adapter de entrada REST do Gateway — "lista de pacientes sob sua responsabilidade / supervisionados"
+ * (enunciado §2.1, médico/estagiário). Rota FHIR-idiomática {@code GET /fhir/Patient} (sem id) → um
+ * {@code Bundle searchset} de Patients, cada um mascarado pelo nível da role (FULL × PARTIAL).
  *
- * <p>O parâmetro {@code ?tipo=} seleciona a consulta nomeada do enunciado (footnote ²):
- * {@code ResumoClinico}, {@code HistoricoClinico} (default), {@code Exames}, {@code Medicamentos}.
- * O tipo só muda a FATIA dos dados — o nível de acesso (FULL/PARTIAL) continua vindo da role.
+ * <p>Segurança: o cliente NÃO informa de quem é a lista — o {@code username} vem do JWT e o filtro por
+ * {@code username_cuidador} é feito no Patient Data, então um cuidador jamais lista pacientes de outro.
+ * Erros gRPC que escapam são traduzidos pelo {@link GrpcHttpExceptionHandler} global.
  */
 @RestController
-public class FhirPatientController {
-
-    /** Consultas individuais válidas (a lista de pacientes é rota própria; coorte idem). */
-    private static final Set<String> TIPOS =
-            Set.of("ResumoClinico", "HistoricoClinico", "Exames", "Medicamentos");
+public class FhirPatientListController {
 
     @GrpcClient("authorization")
     private AuthorizationGrpc.AuthorizationBlockingStub authorizationStub;
@@ -48,35 +39,29 @@ public class FhirPatientController {
     @GrpcClient("data-transform")
     private DataTransformGrpc.DataTransformBlockingStub dataTransformStub;
 
-    @GetMapping("/fhir/Patient/{id}")
-    public ResponseEntity<String> getPatient(@PathVariable String id,
-                                             @RequestParam(defaultValue = "HistoricoClinico") String tipo,
-                                             @AuthenticationPrincipal Jwt jwt) {
-        if (!TIPOS.contains(tipo)) {
-            return ResponseEntity.badRequest().build();
-        }
+    @GetMapping("/fhir/Patient")
+    public ResponseEntity<String> listPatients(@AuthenticationPrincipal Jwt jwt) {
         String username = jwt.getClaimAsString("preferred_username");
         String role = JwtRoles.extractRole(jwt);
 
-        // 1) Autorização.
+        // 1) Autorização: libera pela role (médico/estagiário); a lista é escopada por username adiante.
         AuthzReply authz = authorizationStub.check(AuthzRequest.newBuilder()
                 .setUsername(username == null ? "" : username)
                 .setRole(role)
-                .setTipoConsulta(tipo)
-                .setPatientId(id)
+                .setTipoConsulta("ListaPacientes")
                 .build());
         if (!authz.getAllow()) {
             return ResponseEntity.status(403).build();
         }
         org.slf4j.MDC.put("nivel", authz.getNivel());   // auditoria: nível servido (AccessLogFilter loga)
 
-        // 2) Busca dos dados clínicos crus (fatia conforme o tipo).
+        // 2) Pacientes do cuidador (filtrados por username no Patient Data).
         ClinicalData data = patientDataStub.fetch(PatientQuery.newBuilder()
-                .setPatientId(id)
-                .setTipoConsulta(tipo)
+                .setUsername(username == null ? "" : username)
+                .setTipoConsulta("ListaPacientes")
                 .build());
 
-        // 3) Conversão para FHIR conforme o nível autorizado.
+        // 3) Bundle searchset com o Patient de cada um, mascarado conforme o nível.
         FhirReply fhir = dataTransformStub.toFhir(TransformRequest.newBuilder()
                 .setJsonPayload(data.getJsonPayload())
                 .setNivel(authz.getNivel())

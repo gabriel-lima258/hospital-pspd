@@ -187,7 +187,7 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
 
 | Componente | Dono | Estado | Veredito | Ponteiro |
 |---|:--:|:--:|---|---|
-| **api-gateway** | **Mateus** | 🟡 | JWT real + cadeia gRPC + **2 rotas** (prontuário e coorte); falta rate-limit/logging e o erro gRPC→HTTP **global** (a rota de coorte já mapeia 400/403/404/502 localmente) | `FhirPatientController`, `FhirCohortController`, `SecurityConfig` |
+| **api-gateway** | **Mateus** | ✅ | JWT real + cadeia gRPC + **4 rotas** (prontuário c/ `?tipo=`, lista de pacientes, coorte, lista de projetos) + rate-limit + logging + erro gRPC→HTTP global | `FhirPatientController`, `FhirPatientListController`, `FhirCohortController`, `ProjectListController` |
 | **authorization** | **Mateus** | ✅ | **Completo**: domínio puro + repos + gRPC + 20 testes JUnit; resolve a coorte do projeto (P3c) | `authorization/domain/*`, `adapters/*` |
 | **patient-data** | **Gabriel** | ✅ | **Completo** (P3a): prontuário individual + agregação de coorte + amostra de exames; testes JUnit | `PatientRepository`, `domain/Percentages` |
 | **data-transform** | **Gabriel** | ✅ | **Completo** (P3b): enforcement por `nivel` + 5 recursos FHIR + `MeasureReport`; 37 testes JUnit | `domain/FhirTransformer`, `domain/PatientAnonymizer` |
@@ -271,6 +271,8 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
 - **PNG do Grafana manual** — automação de browser não alcança o port-forward local; capturar à mão.
 - **`JAVA_TOOL_OPTIONS` imprime aviso no stdout** 🟡 — a JVM loga `Picked up JAVA_TOOL_OPTIONS: …` no boot de cada pod do gateway. Cosmético; se o logging estruturado (item 7 do backlog) exigir stdout limpo, mover as flags para o `ENTRYPOINT` do Dockerfile.
 - **Postgres 1 réplica = gargalo esperado** — é **feature** p/ a descoberta §7.1, **não** bug. Não "consertar"; medir e documentar.
+- **Postgres é `Deployment`+PVC, não `StatefulSet`** 🟡 — o enunciado pede só "uma instância do PostgreSQL"; com 1 réplica o `Deployment`+PVC é funcionalmente idêntico (persiste no volume). `StatefulSet` só agrega identidade de rede/ordem com **várias** réplicas de banco, que não é o caso. Decisão consciente; **citar no relatório** (não trocar).
+- **Conformidade das consultas nomeadas** ✅ — enunciado §2.1 + footnote ² pede `ResumoClinico`/`HistoricoClinico`/`Exames`/`Medicamentos`/`ListaPacientes` (médico/estagiário) e `ListaProjetos` (pesquisador, item iv). Todas implementadas (2026-07-11): `?tipo=` na rota individual, `GET /fhir/Patient` (searchset), `GET /projects` (JSON). Proto `PatientQuery.username=4` (aditivo). Ver `docs/contratos.md` e `docs/evidencias/consultas-nomeadas.md`.
 - **Distribuição desigual do trabalho** 🔴 — o **Gabriel** adiantou código de 4 trilhas (authorization=B, seed=D, k8s=A, keycloak=E). O enunciado avalia **"percepção de equilíbrio na distribuição de tarefas"**, e o vídeo expõe quem fez o quê. Mitigação: o *handoff* do §0 + **cada dono faz ao menos um commit substantivo** na peça herdada antes do D7.
 - ~~**Dependência Arthur → Carlos**~~ ✅ **eliminada** — o fix de LB virou **toggle de runtime** (`make grpc-lb-on|off`) em vez de edição destrutiva. Os dois estados coexistem no repo; o Carlos roda as baterias na ordem que quiser. Resta uma pegadinha: como o **default passou a ser o correto**, a rodada "antes" do §7.3 exige `make grpc-lb-off` **explícito**.
 - **Prazo: 1 semana** — priorizar trilhas **A (K8S), C (dados/transform), D (carga)** — são os 80% (§2.1). Frontend rico e FHIR 100% são os primeiros cortes (§ ordem de corte).

@@ -100,10 +100,20 @@ public final class FhirResourceMapper {
         return r;
     }
 
+    /** Bundle {@code collection} (default): agrupa os recursos de um paciente. */
     public Map<String, Object> bundle(List<Map<String, Object>> recursos) {
+        return bundle(recursos, "collection");
+    }
+
+    /** Bundle com {@code type} explícito — {@code searchset} para a lista de pacientes (resultado de busca). */
+    public Map<String, Object> bundle(List<Map<String, Object>> recursos, String type) {
         Map<String, Object> b = new LinkedHashMap<>();
         b.put("resourceType", "Bundle");
-        b.put("type", "collection");
+        b.put("type", type);
+        // `total` só é válido (FHIR) em bundles de resultado de busca — não em `collection`.
+        if ("searchset".equals(type)) {
+            b.put("total", recursos.size());
+        }
         b.put("entry", recursos.stream().map(r -> Map.of("resource", r)).toList());
         return b;
     }

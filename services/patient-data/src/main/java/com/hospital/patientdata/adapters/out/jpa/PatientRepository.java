@@ -59,6 +59,36 @@ public class PatientRepository {
                 patientId);
     }
 
+    // ── Listas (enunciado §2.1) ──────────────────────────────────────────────
+
+    /**
+     * Pacientes sob responsabilidade do cuidador (médico/estagiário) — "lista de pacientes sob sua
+     * responsabilidade / supervisionados". Escopada por {@code username_cuidador} (usa
+     * {@code ix_assign_cuidador}); o cuidador nunca enxerga paciente de outro. O {@code LIMIT} protege
+     * a resposta (um médico do seed tem ~1000 vínculos) — o mascaramento por nível é do Data Transform.
+     */
+    public List<Map<String, Object>> patientsByCaregiver(String username, int limit) {
+        return jdbc.queryForList(
+                "SELECT p.id_paciente, p.nome, p.data_nascimento, p.genero, p.cidade, p.estado, "
+                        + "p.cpf, p.cns "
+                        + "FROM patients p JOIN user_patient_assignments a USING (id_paciente) "
+                        + "WHERE a.username_cuidador = ? AND a.status = 'ativo' "
+                        + "ORDER BY p.id_paciente LIMIT ?",
+                username, limit);
+    }
+
+    /**
+     * Projetos do pesquisador (enunciado item iv: "quais projetos possui e status de cada um").
+     * Traz TODOS os projetos do dono — inclusive Expirado/Suspenso — pois o status é o dado pedido.
+     * Usa {@code ix_projects_pesq}.
+     */
+    public List<Map<String, Object>> projectsByResearcher(String username) {
+        return jdbc.queryForList(
+                "SELECT id_projeto, titulo, codigo_condicao, status, data_validade "
+                        + "FROM projects WHERE username_pesquisador = ? ORDER BY id_projeto",
+                username);
+    }
+
     // ── Agregações da coorte (pesquisador) ───────────────────────────────────
 
     /** Tamanho da coorte: pacientes distintos com o código. */
