@@ -1,11 +1,12 @@
-import Keycloak from 'keycloak-js';
+import Keycloak from "keycloak-js"
+import { env } from "./config"
 
 const keycloakConfig = {
-  url: import.meta.env.VITE_KEYCLOAK_URL,
-  realm: import.meta.env.VITE_KEYCLOAK_REALM,
-  clientId: import.meta.env.VITE_KEYCLOAK_CLIENT_ID
-};
+  url: env.keycloakUrl,
+  realm: env.keycloakRealm,
+  clientId: env.keycloakClientId,
+}
 
-const keycloak = new Keycloak(keycloakConfig);
+const keycloak = new Keycloak(keycloakConfig)
 
-export default keycloak;
+export default keycloak
