@@ -321,6 +321,80 @@ técnico: [roteiro](docs/Roteiro_PSPD_Observabilidade_K8S.md).
 ## Convenções
 
 - **Evidências no ato:** todo print/CSV/gráfico vai para `docs/evidencias/` no mesmo dia.
-- **Observabilidade com método:** métricas em **RED** (por serviço) + **USE** (por recurso); latência
-em **P95/P99**, não só média.
+- **Observabilidade com método:** métricas em **RED** (por serviço) + **USE** (por recurso); latência em **P95/P99**, não só média.
+
+---
+
+## 💻 Frontend (React / TypeScript / Vite)
+
+O frontend do Hospital PSPD foi totalmente implementado contendo todas as regras de controle de acesso demográfico, consultas individuais e agregadas, e um design moderno.
+
+### Como Instalar
+1. Navegue até a pasta do frontend:
+   ```bash
+   cd frontend
+   ```
+2. Instale as dependências:
+   ```bash
+   npm install
+   ```
+
+### Como Executar
+- **Modo Desenvolvimento (com Hot-Reload):**
+  ```bash
+  npm run dev
+  ```
+- **Compilar para Produção:**
+  ```bash
+  npm run build
+  ```
+
+### Variáveis de Ambiente (`.env` na raiz da pasta `frontend`)
+Crie um arquivo `.env` para apontar para o Keycloak real e o API Gateway:
+```env
+VITE_API_GATEWAY_URL=http://localhost:8080
+VITE_KEYCLOAK_URL=http://localhost:8085
+VITE_KEYCLOAK_REALM=hospital-realm
+VITE_KEYCLOAK_CLIENT_ID=hospital-frontend
+VITE_DEMO_MODE=true
+```
+> **Nota:** Defina `VITE_DEMO_MODE=true` para rodar o frontend no modo demonstração (utilizando mockData rico localmente, ideal para testes sem backend local). Caso queira usar o fluxo real do Keycloak, defina `VITE_DEMO_MODE=false`.
+
+### Fluxo de Autenticação
+O sistema implementa o fluxo de autenticação **OAuth2 / OIDC** via Keycloak:
+1. Ao carregar a aplicação, o `AuthProvider` inicializa o cliente do Keycloak (`keycloak-js`).
+2. Se o usuário não estiver autenticado e o `VITE_DEMO_MODE` estiver desligado, o sistema redireciona automaticamente para a página de login do Keycloak.
+3. Após o login bem-sucedido, o token de acesso (JWT) e as claims são salvas e o usuário é redirecionado para o Dashboard.
+4. O frontend injeta automaticamente o token `Authorization: Bearer <token>` em todas as requisições HTTP feitas via Axios.
+5. Um timer em background monitora o tempo de expiração do token (lido do campo `exp` do JWT) e realiza silent updates / refreshes a cada segundo, atualizando a contagem regressiva da sessão no layout.
+
+### Estrutura de Pastas do Frontend
+```
+frontend/src/
+├── components/          # Componentes reutilizáveis
+│   ├── fhir/            # Visualizador de JSON FHIR
+│   ├── patient/         # Componentes do prontuário (PatientCard, FilterPanel)
+│   └── ui/              # Componentes de base (DataTable, ExportButton, Modals, Toasts)
+├── context/             # Provedores de contexto (AuthContext, ThemeContext, ToastContext)
+├── hooks/               # Custom React hooks (useLocalStorage)
+├── layouts/             # Template da página principal (DashboardLayout)
+├── pages/               # Páginas da aplicação (Dashboard, Patients, Profile, Settings)
+├── routes/              # Configurações de rotas protegidas (ProtectedRoute)
+├── services/            # Serviços de API e Configurações (api.ts, keycloak.ts, mockData.ts)
+├── types/               # Tipagens TypeScript (fhir.ts)
+├── utils/               # Utilitários auxiliares (history.ts, utils.ts)
+└── index.css            # Estilos globais e suporte ao Dark Mode
+```
+
+### Funcionalidades Implementadas
+- 🔑 **Login completo via Keycloak:** Com silent login, auto-refresh e proteção de rotas (Protected Routes).
+- 📊 **Dashboard Moderno:** KPIs e múltiplos gráficos (Recharts) interativos com opção de zoom e exportação.
+- 👥 **Listagem e Prontuários:** Tabela avançada de pacientes com paginação e ordenação local, e busca instantânea.
+- 🎛️ **Filtros Avançados:** Filtro por sexo, idade, cidade, estado, diagnóstico, medicamentos e datas integrado à URL.
+- 📑 **Detalhamento do Paciente:** Abas (Resumo Clínico, Histórico, Exames, Medicamentos, Consultas, FHIR) carregadas sob demanda.
+- 🌳 **Visualizador HL7/FHIR:** Árvore JSON interativa, colapsável, com sintaxe colorida, pesquisa de termos e cópia/download.
+- 💾 **Exportações:** Exportação completa de tabelas e prontuários para PDF, CSV, JSON e Excel (XLSX).
+- ⭐ **Favoritos & Histórico:** Sistema de favoritos locais e catálogo automático de histórico de buscas efetuadas.
+- 🌓 **Tema Claro/Escuro:** Sincronizado e persistido localmente via local storage com suporte nativo em CSS.
+
 
