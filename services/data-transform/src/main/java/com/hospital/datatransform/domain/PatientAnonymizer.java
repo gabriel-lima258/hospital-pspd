@@ -26,6 +26,9 @@ public final class PatientAnonymizer {
     /** Extensão FHIR para a faixa etária — o birthDate não pode carregar um intervalo. */
     static final String URL_FAIXA_ETARIA = "http://hospital.unb.br/fhir/faixaEtaria";
 
+    /** CodeSystem de confidencialidade do HL7 — carrega o nível de acesso servido no próprio recurso. */
+    static final String SYSTEM_CONFIDENTIALITY = "http://terminology.hl7.org/CodeSystem/v3-Confidentiality";
+
     /** Identificador usado nas referências {@code subject} do Bundle: real ou pseudonimizado. */
     public String subjectId(JsonNode demographics, Nivel nivel) {
         String idReal = texto(demographics, "id");
@@ -36,6 +39,12 @@ public final class PatientAnonymizer {
         Map<String, Object> patient = new LinkedHashMap<>();
         patient.put("resourceType", "Patient");
         patient.put("id", subjectId(demographics, nivel));
+        // Carimba o nível de acesso servido no próprio recurso FHIR (meta.security). O frontend lê este
+        // código para exibir o selo FULL/PARTIAL; a fonte da verdade continua sendo o Authorization.
+        patient.put("meta", Map.of("security", List.of(Map.of(
+                "system", SYSTEM_CONFIDENTIALITY,
+                "code", nivel.name(),
+                "display", nivel.name()))));
 
         String nascimento = texto(demographics, "data_nascimento");
 

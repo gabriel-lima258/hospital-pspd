@@ -4,14 +4,15 @@ import {
   ChevronLeft,
   ChevronRight,
   Database,
+  FolderKanban,
   Hash,
+  Pill,
   Search,
   ShieldCheck,
   Sparkles,
 } from "lucide-react"
-import { fetchCohort, toApiError, type ApiError } from "@/services/api"
-import { DEMO_PROJECT_IDS } from "@/services/mockData"
-import type { CohortExamRow, CohortResult } from "@/types/fhir"
+import { fetchCohort, fetchProjects, toApiError, type ApiError } from "@/services/api"
+import type { CohortExamRow, CohortResult, ProjectSummary } from "@/types/fhir"
 import { useAuth } from "@/context/AuthContext"
 import { Alert, Card, CardBody, CardHeader, EmptyState, Skeleton } from "@/components/ui"
 
@@ -20,7 +21,26 @@ const PAGE_SIZE = 8
 
 function formatGenderLabel(gender?: string) {
   if (!gender) return "—"
-  return gender === "F" ? "Feminino" : gender === "M" ? "Masculino" : gender
+  switch (gender) {
+    case "female":
+    case "F":
+      return "Feminino"
+    case "male":
+    case "M":
+      return "Masculino"
+    case "other":
+      return "Outro"
+    default:
+      return gender
+  }
+}
+
+/** Cor do selo de status do projeto (Aprovado × Expirado/Suspenso). */
+function statusTone(status: string): string {
+  const s = status.toLowerCase()
+  if (s.includes("aprov")) return "bg-emerald-500/10 text-emerald-600"
+  if (s.includes("expir")) return "bg-red-500/10 text-red-600"
+  return "bg-amber-500/10 text-amber-600"
 }
 
 function SummaryMetric({ label, value, description }: { label: string; value: string; description?: string }) {
@@ -29,6 +49,26 @@ function SummaryMetric({ label, value, description }: { label: string; value: st
       <p className="text-sm font-medium text-muted-foreground">{label}</p>
       <p className="mt-3 text-3xl font-semibold tracking-tight text-foreground">{value}</p>
       {description ? <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{description}</p> : null}
+    </div>
+  )
+}
+
+/** Barras horizontais para distribuições percentuais (setor, medicamentos). */
+function ShareBars({ items }: { items: { rotulo: string; percentual: number }[] }) {
+  if (items.length === 0) return <p className="px-5 pb-5 text-sm text-muted-foreground">Sem dados.</p>
+  return (
+    <div className="space-y-4 px-5 pb-5">
+      {items.map((item) => (
+        <div key={item.rotulo} className="space-y-2">
+          <div className="flex items-center justify-between text-sm font-medium text-foreground">
+            <span>{item.rotulo}</span>
+            <span>{item.percentual}%</span>
+          </div>
+          <div className="h-3 overflow-hidden rounded-full bg-muted">
+            <div className="h-full rounded-full bg-accent" style={{ width: `${Math.min(item.percentual, 100)}%` }} />
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
@@ -42,8 +82,17 @@ function CohortView() {
   const [error, setError] = useState<ApiError | null>(null)
   const [result, setResult] = useState<CohortResult | null>(null)
   const [page, setPage] = useState(0)
+  const [projects, setProjects] = useState<ProjectSummary[]>([])
 
-  const suggestions = useMemo(() => DEMO_PROJECT_IDS.slice(0, 3), [])
+  // Lista real de projetos do pesquisador (GET /projects) — enunciado item iv.
+  useEffect(() => {
+    if (!isResearcher) return
+    let alive = true
+    fetchProjects()
+      .then((p) => { if (alive) setProjects(p) })
+      .catch(() => { if (alive) setProjects([]) })
+    return () => { alive = false }
+  }, [isResearcher])
 
   const clearResult = useCallback(() => {
     setResult(null)
@@ -171,22 +220,38 @@ function CohortView() {
           </button>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-          <span>Sugestões:</span>
-          {suggestions.map((suggestion) => (
-            <button
-              type="button"
-              key={suggestion}
-              onClick={() => {
-                setProjetoId(suggestion)
-                loadCohort(suggestion)
-              }}
-              className="rounded-full border border-border bg-muted px-3 py-2 text-xs font-semibold text-foreground transition hover:border-ring hover:bg-accent/10"
-            >
-              {suggestion}
-            </button>
-          ))}
-        </div>
+        {projects.length > 0 ? (
+          <div className="mt-4 space-y-2">
+            <p className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+              <FolderKanban className="size-4 text-accent" />
+              Meus projetos ({projects.length})
+            </p>
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+              {projects.map((prj) => (
+                <button
+                  type="button"
+                  key={prj.id}
+                  onClick={() => {
+                    setProjetoId(prj.id)
+                    loadCohort(prj.id)
+                  }}
+                  className="flex flex-col gap-1 rounded-xl border border-border bg-background p-3 text-left transition hover:border-ring hover:bg-accent/5"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-mono text-xs font-bold text-foreground">{prj.id}</span>
+                    <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${statusTone(prj.status)}`}>
+                      {prj.status}
+                    </span>
+                  </div>
+                  <span className="truncate text-sm text-foreground">{prj.titulo}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {prj.condicao}{prj.validade ? ` · válido até ${prj.validade}` : ""}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </form>
 
       {status === "error" && error ? (
@@ -295,6 +360,30 @@ function CohortView() {
                   </div>
                 </Card>
               </div>
+
+              <div className="grid gap-4 xl:grid-cols-2">
+                <Card className="space-y-4">
+                  <div className="flex items-center justify-between px-5 pt-5">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Departamentos mais usados</p>
+                      <h3 className="text-lg font-semibold text-foreground">Distribuição por setor</h3>
+                    </div>
+                    <Database className="size-5 text-accent" />
+                  </div>
+                  <ShareBars items={result.distribuicaoSetor ?? []} />
+                </Card>
+
+                <Card className="space-y-4">
+                  <div className="flex items-center justify-between px-5 pt-5">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Frequência de medicamentos</p>
+                      <h3 className="text-lg font-semibold text-foreground">Uso na coorte</h3>
+                    </div>
+                    <Pill className="size-5 text-accent" />
+                  </div>
+                  <ShareBars items={result.frequenciaMedicamentos ?? []} />
+                </Card>
+              </div>
             </section>
           ) : (
             <section className="space-y-5">
@@ -317,7 +406,7 @@ function CohortView() {
                     <thead className="bg-muted text-xs uppercase tracking-wide text-muted-foreground">
                       <tr>
                         <th className="px-4 py-3">ID Anonimizado</th>
-                        <th className="px-4 py-3">Idade</th>
+                        <th className="px-4 py-3">Faixa etária</th>
                         <th className="px-4 py-3">Gênero</th>
                         {result.colunas.map((column) => (
                           <th key={column.chave} className="px-4 py-3">
@@ -330,7 +419,7 @@ function CohortView() {
                       {currentRows.map((row) => (
                         <tr key={row.hashId} className="hover:bg-muted/60">
                           <td className="px-4 py-3 font-mono text-xs text-foreground">{row.hashId}</td>
-                          <td className="px-4 py-3 text-foreground">{row.idadeAprox ?? "—"}</td>
+                          <td className="px-4 py-3 text-foreground">{row.faixaEtaria ?? "—"}</td>
                           <td className="px-4 py-3 text-foreground">{formatGenderLabel(row.genero)}</td>
                           {result.colunas.map((column) => (
                             <td key={column.chave} className="px-4 py-3 text-foreground">

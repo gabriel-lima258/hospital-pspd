@@ -49,6 +49,10 @@ management:
 
 # Config do Gateway (namespace próprio, fora do Spring).
 gateway:
+  # CORS para o frontend SPA (browser). Lista de origem-patterns separada por vírgula; o default cobre
+  # localhost em qualquer porta (dev-server e o container do frontend via port-forward). Ver SecurityConfig.
+  cors:
+    allowed-origins: ${GATEWAY_CORS_ORIGINS:http://localhost:*}
   # Deadline default das chamadas gRPC (protege o thread pool sob carga; estouro → 504).
   # Override por env GATEWAY_GRPC_DEADLINE_MS. Ver grpc/DeadlineClientInterceptor.
   grpc:

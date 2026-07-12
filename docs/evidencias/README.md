@@ -10,6 +10,7 @@
 | `data-transform-niveis.md` | D3 · P3b | enforcement por nível + os 5 recursos FHIR |
 | `pesquisador-coorte.md` | D3 · **P3c** | as **3 jornadas REST**; a coorte nasce no servidor; 400/403/404/502 |
 | `consultas-nomeadas.md` | Conformidade §2.1 | consultas nomeadas (Resumo/Historico/Exames/Medicamentos), lista de pacientes (searchset) e de projetos (JSON); testes JUnit verdes, 🚧 capturas `curl` |
+| `frontend-real.md` | Frontend | SPA React real: OIDC + 3 jornadas contra o gateway, CORS, `meta.security`, coorte rica; builds verdes, 🚧 prints |
 | `escala-hpa-grpc-lb.md` | D5 · Portão 5 | blocos solo capturados (DNS 1×3, pods-wide, HPA %/60%, smoke); 🚧 carga (§2/§4b) pendente do k6 |
 | `hpa-timeline.csv` | D5 · Portão 5 | 🚧 gerado por `make watch-hpa` — réplicas/CPU × tempo, por cenário (gráfico §4.9 #6) |
 | `rate-limit-429.md` | D4 · Portão 4 | rate limiting: 429 sob rajada `-P20` (72×200 + 128×429) |

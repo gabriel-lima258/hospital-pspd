@@ -125,7 +125,13 @@ export interface CohortExamAverage {
   referencia?: string
 }
 
-/** Resposta de ?tipo=ResumoCoorte */
+/** Distribuição percentual rotulada (setor, medicamento, etc.). */
+export interface CohortShare {
+  rotulo: string
+  percentual: number
+}
+
+/** Resposta de ?tipo=ResumoCoorte / Estatisticas */
 export interface CohortSummary {
   tipo: "ResumoCoorte"
   projetoId: string
@@ -138,14 +144,28 @@ export interface CohortSummary {
   }
   faixasEtarias: CohortAgeBand[]
   mediasExames: CohortExamAverage[]
+  /** Departamentos mais usados (porSetor) — enunciado item ii. */
+  distribuicaoSetor: CohortShare[]
+  /** Frequência de utilização de medicamentos (freqMedicamentos) — enunciado item ii. */
+  frequenciaMedicamentos: CohortShare[]
 }
 
 export interface CohortExamRow {
   /** Identificador anonimizado (hash). */
   hashId: string
-  idadeAprox?: number
+  /** Faixa etária (o backend anonimiza a idade exata sob ANONYMIZED). */
+  faixaEtaria?: string
   genero?: string
   exames: Record<string, number>
+}
+
+/** Item da lista de projetos do pesquisador — GET /projects (enunciado item iv). */
+export interface ProjectSummary {
+  id: string
+  titulo: string
+  condicao: string
+  status: string
+  validade?: string
 }
 
 /** Resposta de ?tipo=ExamesCoorte */

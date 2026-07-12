@@ -1,7 +1,9 @@
 import axios from "axios"
 import keycloak from "./keycloak"
 import { IS_DEMO, env } from "./config"
-import { getMockCohort, getMockPatientBundle, DEMO_PATIENT_IDS } from "./mockData"
+import { getMockCohort, getMockPatientBundle, getMockProjects, DEMO_PATIENT_IDS } from "./mockData"
+import { bundleToCohortExams, measureReportToCohortSummary } from "@/lib/cohort"
+import type { CohortResult, ProjectSummary } from "@/types/fhir"
 import type { Role } from "./config"
 
 const api = axios.create({
@@ -184,23 +186,24 @@ export async function fetchCohort(
     return result
   }
 
+  // Real: o gateway devolve FHIR cru. Adaptamos para o domínio que a UI consome.
   const { data } = await api.get(
     `/fhir/cohort/${encodeURIComponent(projetoId)}`,
     { params: { tipo } },
   )
-  return data
+  return (tipo === "ExamesCoorte"
+    ? bundleToCohortExams(data, projetoId)
+    : measureReportToCohortSummary(data, projetoId)) as CohortResult
 }
 
-/** GET /projects (Lista de projetos para pesquisadores) */
-export async function fetchProjects() {
+/** GET /projects — lista de projetos do pesquisador + status (enunciado item iv). */
+export async function fetchProjects(): Promise<ProjectSummary[]> {
   if (IS_DEMO) {
     await delay(400)
-    return [
-      { id: "PRJ01", nome: "Estudo de Controle Glicêmico", coorteCodigo: "DIABETES_2026", status: "Ativo" },
-      { id: "PRJ02", nome: "Coorte Renal Crônica", coorteCodigo: "RENAL_CHRONIC_2026", status: "Ativo" },
-    ]
+    return getMockProjects()
   }
 
+  // Real: { projetos: [{ id, titulo, condicao, status, validade }] } — JSON puro (não-FHIR).
   const { data } = await api.get("/projects")
-  return data
+  return (data?.projetos ?? []) as ProjectSummary[]
 }

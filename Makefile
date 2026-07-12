@@ -1,5 +1,5 @@
 # Makefile — Hospital Universitário (PSPD/UnB). Tudo que repete vira alvo (regra de ouro 4).
-.PHONY: up rebuild down logs cluster cluster-down grafana check-cluster-tools images deploy redeploy \
+.PHONY: up rebuild down logs cluster cluster-down grafana front check-cluster-tools images deploy redeploy \
         seed seed-local grpc-lb-on grpc-lb-off hpa-on hpa-off scale pods-wide watch-hpa load plot loki dashboard tracing tracing-off demo help
 
 # Nome do cluster kind (usado por cluster / cluster-down / deploy futuro).
@@ -14,6 +14,7 @@ help:
 	@echo "  make cluster     - cria kind 1+3 + metrics-server + kube-prometheus-stack [D1 ✓]"
 	@echo "  make cluster-down - deleta o cluster kind ($(KIND_CLUSTER))"
 	@echo "  make grafana     - port-forward do Grafana em http://localhost:3000 (admin + senha do secret)"
+	@echo "  make front       - port-forward do frontend em http://localhost:8088 (SPA React)"
 	@echo "  make loki        - Loki + Promtail (bônus): agrega logs JSON no Grafana (LogQL)"
 	@echo "  make dashboard   - importa o dashboard RED/USE no Grafana do kps (fase e)"
 	@echo "  make tracing     - Tempo + OTel agent (bônus): liga traces REST→gRPC→SQL no Grafana"
@@ -150,6 +151,10 @@ images:
 	  echo ">> kind load hospital/$$s:dev"; \
 	  kind load docker-image hospital/$$s:dev --name $(KIND_CLUSTER) || exit 1; \
 	done
+	@echo ">> docker build hospital/frontend:dev (contexto = ./frontend)"
+	docker build -t hospital/frontend:dev -f frontend/Dockerfile frontend || exit 1
+	@echo ">> kind load hospital/frontend:dev"
+	kind load docker-image hospital/frontend:dev --name $(KIND_CLUSTER) || exit 1
 
 # Deploy completo: gera ConfigMaps a partir dos arquivos-fonte, aplica manifests e espera os rollouts.
 deploy: check-cluster-tools images
@@ -167,12 +172,18 @@ deploy: check-cluster-tools images
 	kubectl rollout status deploy/db       --timeout=180s
 	kubectl rollout status deploy/keycloak --timeout=240s
 	@for s in $(SERVICES); do kubectl rollout status deploy/$$s --timeout=240s || exit 1; done
+	kubectl rollout status deploy/frontend --timeout=180s
 	@echo "OK. Confira: kubectl get pods"
 
-# Recarrega só o código dos 4 serviços (rebuild + kind load + rollout restart); manifests já aplicados.
+# Recarrega o código dos 4 serviços + frontend (rebuild + kind load + rollout restart); manifests já aplicados.
 redeploy: check-cluster-tools images
-	@for s in $(SERVICES); do kubectl rollout restart deploy/$$s; done
-	@for s in $(SERVICES); do kubectl rollout status deploy/$$s --timeout=240s || exit 1; done
+	@for s in $(SERVICES) frontend; do kubectl rollout restart deploy/$$s; done
+	@for s in $(SERVICES) frontend; do kubectl rollout status deploy/$$s --timeout=240s || exit 1; done
+
+# Port-forward do frontend (SPA) em http://localhost:8088. Requer também os port-forwards de
+# api-gateway (9000) e keycloak (8080, com '127.0.0.1 keycloak' no hosts) — ver docs/RUNBOOK-frontend.md.
+front: check-cluster-tools
+	kubectl port-forward svc/frontend 8088:80
 
 # ── Seed de volume (Trilha D, §4.4) ──────────────────────────────────────────
 # nº de pacientes; encounters/events derivam disto no seed.py. Override: make seed SCALE=200000

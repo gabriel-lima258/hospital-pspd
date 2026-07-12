@@ -1,0 +1,44 @@
+# Frontend SPA (React/Vite) servido por nginx (porta 80). Único cliente do gateway pelo browser.
+# Acesso: kubectl port-forward svc/frontend 8088:80  → http://localhost:8088
+# CORS liberado no gateway (SecurityConfig) para a origem localhost:*; login OIDC pelo Keycloak real.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  labels: { app: frontend }
+spec:
+  # `replicas` omitido (coerente com os demais): a SPA é stateless; escala não é o foco do estudo.
+  selector:
+    matchLabels: { app: frontend }
+  template:
+    metadata:
+      labels: { app: frontend }
+    spec:
+      containers:
+        - name: frontend
+          image: hospital/frontend:dev
+          imagePullPolicy: IfNotPresent
+          ports:
+            - { containerPort: 80, name: http }
+          readinessProbe:
+            httpGet: { path: /, port: 80 }
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /, port: 80 }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests: { cpu: "50m",  memory: "64Mi" }
+            limits:   { cpu: "250m", memory: "128Mi" }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  labels: { app: frontend }
+spec:
+  type: ClusterIP
+  selector: { app: frontend }
+  ports:
+    - { name: http, port: 80, targetPort: 80 }

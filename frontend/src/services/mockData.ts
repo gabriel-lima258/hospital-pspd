@@ -3,6 +3,7 @@ import type {
   CohortSummary,
   FhirBundle,
   FhirClinicalResource,
+  ProjectSummary,
 } from "@/types/fhir"
 
 /**
@@ -283,6 +284,16 @@ const COHORT_SUMMARIES: Record<string, CohortSummary> = {
       { exame: "Colesterol LDL", media: 109, unidade: "mg/dL", referencia: "< 100" },
       { exame: "IMC", media: 28.4, unidade: "kg/m²", referencia: "18.5-24.9" },
     ],
+    distribuicaoSetor: [
+      { rotulo: "Endocrinologia", percentual: 62 },
+      { rotulo: "Cardiologia", percentual: 21 },
+      { rotulo: "Clínica Geral", percentual: 17 },
+    ],
+    frequenciaMedicamentos: [
+      { rotulo: "Metformina", percentual: 48 },
+      { rotulo: "Insulina", percentual: 33 },
+      { rotulo: "Losartana", percentual: 19 },
+    ],
   },
   PRJ02: {
     tipo: "ResumoCoorte",
@@ -301,7 +312,28 @@ const COHORT_SUMMARIES: Record<string, CohortSummary> = {
       { exame: "TFG", media: 52, unidade: "mL/min", referencia: "> 90" },
       { exame: "Potássio", media: 4.8, unidade: "mmol/L", referencia: "3.5-5.0" },
     ],
+    distribuicaoSetor: [
+      { rotulo: "Nefrologia", percentual: 71 },
+      { rotulo: "Cardiologia", percentual: 18 },
+      { rotulo: "Clínica Geral", percentual: 11 },
+    ],
+    frequenciaMedicamentos: [
+      { rotulo: "Enalapril", percentual: 44 },
+      { rotulo: "Furosemida", percentual: 31 },
+      { rotulo: "Losartana", percentual: 25 },
+    ],
   },
+}
+
+/** Projetos fictícios do pesquisador (modo demo) — espelha GET /projects real. */
+const MOCK_PROJECTS: ProjectSummary[] = [
+  { id: "PRJ01", titulo: "Estudo de Controle Glicêmico", condicao: "Diabetes", status: "Aprovado", validade: "2027-12-31" },
+  { id: "PRJ02", titulo: "Coorte Renal Crônica", condicao: "Hipertensao", status: "Expirado", validade: "2024-01-01" },
+  { id: "PRJ03", titulo: "Coorte de Doença Rara (vazia)", condicao: "Rara", status: "Aprovado", validade: "2027-12-31" },
+]
+
+export function getMockProjects(): ProjectSummary[] {
+  return MOCK_PROJECTS
 }
 
 function buildExamsResult(projetoId: string, summary: CohortSummary): CohortExamsResult {
@@ -311,6 +343,7 @@ function buildExamsResult(projetoId: string, summary: CohortSummary): CohortExam
     unidade: m.unidade,
   }))
 
+  const FAIXAS = ["18-39", "40-59", "60+"]
   // Gera linhas determinísticas em torno das médias (dados sintéticos).
   const linhas = Array.from({ length: 47 }).map((_, i) => {
     const seed = i + 1
@@ -323,8 +356,8 @@ function buildExamsResult(projetoId: string, summary: CohortSummary): CohortExam
     })
     return {
       hashId: hash(`${projetoId}-${seed}`),
-      idadeAprox: 20 + ((seed * 7) % 55),
-      genero: seed % 2 === 0 ? "F" : "M",
+      faixaEtaria: FAIXAS[seed % FAIXAS.length],
+      genero: seed % 2 === 0 ? "female" : "male",
       exames,
     }
   })

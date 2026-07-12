@@ -101,6 +101,16 @@ class FhirTransformerTest {
         }
 
         @Test
+        @DisplayName("meta.security carimba o nível de acesso servido no próprio Patient")
+        void metaSecurity() throws Exception {
+            for (String nivel : new String[] {"FULL", "PARTIAL", "ANONYMIZED"}) {
+                JsonNode patient = transform(INDIVIDUAL, nivel).get("entry").get(0).get("resource");
+                assertThat(patient.get("meta").get("security").get(0).get("code").asText())
+                        .as(nivel).isEqualTo(nivel);
+            }
+        }
+
+        @Test
         @DisplayName("ANONYMIZED trunca as datas clínicas ao ano e referencia o pseudônimo")
         void anonymizedTruncaDatas() throws Exception {
             JsonNode bundle = transform(INDIVIDUAL, "ANONYMIZED");

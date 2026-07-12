@@ -119,6 +119,16 @@ próprio `try/catch`.)
 Todas exigem `Authorization: Bearer <JWT>`; DENY → **403**. `GET /fhir/Patient/{id}` inexistente →
 **404** (`GrpcHttpExceptionHandler`). `?tipo=` inválido → **400**.
 
+**CORS (frontend SPA).** O gateway habilita CORS (`SecurityConfig.corsConfigurationSource`) para o
+browser chamar a API cross-origin com `Authorization`. Origens por `allowedOriginPatterns` (default
+`http://localhost:*`, env `GATEWAY_CORS_ORIGINS`), métodos `GET,OPTIONS`, sem credenciais (usa Bearer,
+não cookie). O preflight `OPTIONS` é respondido antes do AccessLog/RateLimit e não exige token.
+
+**Login OIDC no browser (issuer).** O token traz `iss=http://keycloak:8080`. Para o browser e o cluster
+resolverem o **mesmo** host (sem tocar no backend), o frontend usa um alias `127.0.0.1 keycloak` no
+`hosts` + port-forward do Keycloak — assim o `iss` bate com o `issuer-uri` do gateway. O fluxo k6/curl
+(`get-token.sh`) fica intacto. Ver `docs/RUNBOOK-frontend.md`.
+
 **Mapa gRPC→HTTP global** (`GrpcHttpExceptionHandler`, `@RestControllerAdvice`) — cobre as rotas
 **sem** `catch` local, hoje a de prontuário `GET /fhir/Patient/{id}`. Traduz o código do
 `StatusRuntimeException`: `NOT_FOUND`→**404**, `INVALID_ARGUMENT`→**400**, `PERMISSION_DENIED`→**403**,
@@ -164,6 +174,11 @@ Não altera o contrato gRPC (proto) nem o REST — é transporte de metadados, t
 
 O pseudônimo é `sha256(SALT + "\|" + id)` truncado — estável (mesmo id ⇒ mesmo hash), para que os
 recursos de um paciente continuem ligados dentro do Bundle sem revelar quem ele é.
+
+**`Patient.meta.security`** — o recurso Patient carrega o nível servido no próprio FHIR:
+`meta.security = [{ system: ".../v3-Confidentiality", code: FULL|PARTIAL|ANONYMIZED }]`
+(`PatientAnonymizer`). O frontend lê esse código para o selo de acesso; a fonte da verdade da decisão
+continua no Authorization.
 
 Nível ausente/desconhecido, ou incompatível com a shape do payload (ex.: `FULL` com payload de
 coorte), devolve `INVALID_ARGUMENT`. Ver `docs/evidencias/data-transform-niveis.md`.

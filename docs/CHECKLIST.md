@@ -7,8 +7,8 @@
 > [`docs/Roteiro_PSPD_Observabilidade_K8S.md`](Roteiro_PSPD_Observabilidade_K8S.md) (§3 cronograma,
 > §5 métricas, §7 descobertas, §9 entrega, **Apêndice A** portões 0–7).
 >
-> **Última atualização:** 2026-07-11 · **Fase atual:** **D4/D5 em andamento** — o backend funcional e a infra de escala/observabilidade estão implementados, mas a fase de carga ainda não foi executada de forma verificável.
-> **Avaliação verificada hoje:** `./gradlew test` → **BUILD SUCCESSFUL**; o backend core está funcional e com testes verdes; o frontend ainda está apenas como placeholder (`frontend/.gitkeep`); a execução real das baterias k6/HPA e a coleta de evidências continuam pendentes.
+> **Última atualização:** 2026-07-12 · **Fase atual:** **D4/D5 em andamento** — backend funcional, **frontend real integrado**, infra de escala/observabilidade implementada; falta **executar a carga** de forma verificável.
+> **Avaliação verificada hoje:** `./gradlew build` **e** `npm run build` → **verdes**; backend core + **consultas nomeadas** + **frontend real** (OIDC + 3 jornadas contra o gateway, containerizado no K8S) prontos e com testes verdes; a execução real das baterias k6/HPA e a coleta de evidências (incl. prints do frontend) continuam pendentes.
 > O **M2 fechou**: P3a ✅ fonte de dados de coorte · P3b ✅ enforcement por nível + FHIR completo ·
 > P3c ✅ rota REST de coorte — as **3 jornadas** (médico/FULL, estagiário/PARTIAL, pesquisador/AGG+ANON)
 > validadas ponta-a-ponta no cluster.
@@ -16,6 +16,8 @@
 > A **Trilha A** entregou a infra de escala: Service headless + `round_robin`, HPA (min1/max10/CPU 60%),
 > toggles `grpc-lb-on|off` / `hpa-on|off` / `scale N=`, e `make demo` real. **O que falta agora é medir isso com carga real e registrar evidências**.
 > Daqui em diante a nota vem exclusivamente de **números medidos**.
+
+> 👉 **Só o que falta (acionável):** [`docs/CHECKLIST-PENDENTE.md`](CHECKLIST-PENDENTE.md) — carga, escala/HPA, screenshots, prints do frontend, descobertas §7 e entrega.
 
 **Legenda:** ✅ feito · 🟡 parcial · ⬜ a fazer · ➕ bônus (ponto extra) · 🔴 crítico
 **Donos:** cada item pendente começa com o nome do responsável — ver a divisão de trilhas no §0.
@@ -34,7 +36,7 @@ vídeo (§9.4) — o enunciado avalia "percepção de equilíbrio na distribuiç
 | **Mateus** | (B) Backend Core — Gateway + Auth | rate limiting, logging estruturado, erro gRPC→HTTP, probes, `authorization` | 🟡 |
 | **Gabriel** | (C) Backend Dados | patient-data, data-transform, **P3c**, guarda dos portões | ✅ |
 | **Carlos** | (D) Dados & Carga (Performance) | k6, `collect-metrics.sh`, `plot.py`, CSVs, gráficos, **as 3 descobertas §7**, `db/` | ⬜ |
-| **Guilherme** | (E) Frontend + Observabilidade viz + **entrega** | frontend React, **dashboards Grafana RED/USE**, `keycloak/`, tracing ➕, **relatório §9 + zip** | ⬜ |
+| **Guilherme** | (E) Frontend + Observabilidade viz + **entrega** | ✅ frontend React real (K8S), `keycloak/` · pendente: **dashboards screenshots**, tracing ➕ screenshot, **relatório §9 + zip** | 🟡 |
 
 > **Relatório:** cada trilha **escreve a sua seção** (é o que cada um apresenta no vídeo);
 > o **Guilherme consolida** na estrutura §9.6, fecha as conclusões e entrega o zip no Moodle.
@@ -59,8 +61,8 @@ o Gabriel faz o *handoff* (o commit é histórico, a responsabilidade não).
 ### Caminho crítico (quem não pode atrasar)
 
 ⭐ **Arthur** e **Carlos** carregam os **80%** da nota: sem balanceamento gRPC + HPA não há o que medir;
-sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro ajuda os dois — e o
-**frontend do Guilherme é o primeiro a cortar** (§ordem de corte).
+sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro ajuda os dois. _(O
+**frontend já foi entregue** — real e no K8S — então saiu da lista de cortes; foco total na carga.)_
 
 ~~**Dependência dura:** Arthur precisa entregar o fix antes de Carlos medir.~~ **Resolvida:** o fix é um
 **toggle** (`make grpc-lb-on|off`), então os dois estados coexistem e o Carlos não espera ninguém. O que
@@ -88,7 +90,7 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
 | (b) Testes de carga (10/50/100/500/1000 VUs) | `░░░░░░░░░░` | ⬜ |
 | (c) Escalabilidade horizontal (1→3 réplicas) | `░░░░░░░░░░` | ⬜ |
 | (d) Autoscaling (HPA min1/max10) | `░░░░░░░░░░` | ⬜ |
-| (e) Observabilidade (≥5 métricas, RED+USE) | `███░░░░░░░` scrape ok, sem dashboard | 🟡 |
+| (e) Observabilidade (≥5 métricas, RED+USE) | `██████░░░░` scrape + dashboard JSON prontos; falta screenshot sob carga | 🟡 |
 
 ---
 
@@ -99,7 +101,7 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
 - [x] **Backend funcional e integrado** — gateway, authorization, patient-data e data-transform estão implementados e o fluxo ponta-a-ponta foi validado no cluster.
 - [x] **Infra/observabilidade base pronta** — manifests K8s, headless gRPC, HPA, dashboards e ferramentas de Loki/Tracing existem no repositório.
 - [ ] **Carga real ainda não executada** — as baterias k6, os cenários 1 réplica/3 réplicas/HPA e os gráficos comparativos ainda precisam ser rodados e registrados.
-- [ ] **Frontend mínimo pendente** — o diretório [frontend](../frontend) ainda está vazio, com apenas [frontend/.gitkeep](../frontend/.gitkeep); isso impacta a demo final e o vídeo.
+- [x] **Frontend real pronto** — SPA React/Vite integrada (OIDC + 3 jornadas contra o gateway, adapter FHIR→UI), containerizada no K8S (`k8s/base/frontend.yaml`, `make deploy`). Builds verdes; 🚧 prints E2E a colher (`docs/RUNBOOK-frontend.md`).
 - [ ] **Entrega final pendente** — relatório, vídeo e consolidação das evidências continuam faltando.
 
 ### 🚦 Portão 0 — Máquina pronta ✅
@@ -203,11 +205,11 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
 | **db** | **Carlos** | ✅ | schema (5 tabelas+índices), seed volume + seed-min, fixtures negativos (`PRJ02`/`PRJ03`/`PRJ04`) | `db/*` |
 | **keycloak** | **Guilherme** | ✅ | realm + roles + 4 usuários + get-token | `keycloak/*` |
 | **k8s/base** | **Arthur** | ✅ | 6 Deployments/Services, `requests.cpu` setado, `replicas:` removido, 3 Services headless | `k8s/base/*` |
-| **k8s/observability** | **Guilherme** | 🟡 | só ServiceMonitor; **sem dashboard JSON** | `k8s/observability/servicemonitor.yaml` |
-| **HPA** | **Arthur** | 🟡 | manifesto pronto (v2, min1/max10, CPU 60%, 4 serviços); **falta aplicar e evidenciar `%/60%`** | `k8s/hpa/hpa.yaml` |
-| **Services gRPC** | **Arthur** | 🟡 | headless + `round_robin` é o **default**; toggle `grpc-lb-off` reproduz o ClusterIP p/ o §7.3. **Falta medir antes/depois** | `k8s/base/grpc-headless.yaml`, gateway `application.yml` |
+| **k8s/observability** | **Guilherme** | 🟡 | ServiceMonitor + dashboard RED/USE (`dashboards/red-use.json`) + datasources Loki/Tempo/pg-exporter; **falta screenshot ao vivo** | `k8s/observability/*` |
+| **HPA** | **Arthur** | 🟡 | manifesto pronto (v2, min1/max10, CPU 60%, 4 serviços); `%/60%` capturado 2026-07-10 (`escala-hpa-grpc-lb.md`); **falta timeline sob carga** (`get hpa -w`, depende do k6) | `k8s/hpa/hpa.yaml` |
+| **Services gRPC** | **Arthur** | 🟡 | headless + `round_robin` é o **default**; DNS 1×3 e `pods-wide` capturados; **falta medir antes/depois sob carga** (`grpc-lb-off/on`) | `k8s/base/grpc-headless.yaml`, gateway `application.yml` |
 | **loadtest** | **Carlos** | 🟡 | harness pronto (`scenario.js`, `gen-tokens.sh`, `run-load-tests.sh`, `collect-metrics.sh`, `plot.py`; Arthur adiantou) — **falta rodar** e coletar | `loadtest/` |
-| **frontend** | **Guilherme** | ⬜ | vazio (só `.gitkeep`) — **obrigatório mínimo** (§9.1: login OIDC + 3 consultas), mas P2 e 1º a cortar | `frontend/` · client `hospital-frontend` no realm |
+| **frontend** | **Guilherme** | ✅ | React/Vite **real**: login OIDC (Keycloak) + 3 jornadas contra o gateway (FULL/PARTIAL/coorte), adapter FHIR→UI, listas de pacientes/projetos. Containerizado no K8S (`make deploy`). Modo demo preservado como fallback | `frontend/*` · `k8s/base/frontend.yaml` · `docs/RUNBOOK-frontend.md` |
 | **tracing (OTel+Tempo)** | — | ✅ ➕ | OTel agent nos 4 (`Dockerfile`) + `make tracing` + `tempo-datasource.yaml`; Arthur adiantou. Falta screenshot | `services/*/Dockerfile` · `k8s/observability/tempo-datasource.yaml` |
 | **Makefile** | **Arthur** | ✅ | todos os alvos reais: `rebuild`, `demo`, `scale`, `pods-wide`, `grpc-lb-on|off`, `hpa-on|off`, e agora `load`/`plot` (harness k6 em `loadtest/`) | `Makefile` |
 
@@ -233,11 +235,7 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
 5. **Carlos** · **⭐ `plot.py` + CSVs → PNGs** _(Portão 6)_ — gráficos comparativos.
 6. **Tracing (OTel + Tempo)** _(Portão 6)_ — ✅ tooling (`make tracing`, Arthur adiantou). **Resta (Guilherme):** ligar sob debug + screenshot do trace multi-serviço e do salto trace→log.
 7. **Gateway maduro** _(Portão 4)_ — ✅ rate limiting, ✅ logging estruturado JSON, ✅ erro gRPC→HTTP global (`GrpcHttpExceptionHandler`: paciente inexistente → 404) já feitos (Arthur adiantou; ver itens do Portão 4). **Resta só (Mateus):** readiness _dependency-aware_ que checa o DB.
-8. **Guilherme** · **frontend mínimo** _(§9.1 / §9.7 · Portão 3+7)_ — **obrigatório, mas mínimo e P2** (baixo valor isolado; **primeiro a cortar** sob pressão — ordem de corte §R9: frontend rico → FHIR 100% → cenários extras).
-   - **Objetivo:** 1 SPA enxuta que autentica via **OAuth2/OIDC no Keycloak** (client `hospital-frontend`, Standard Flow) e faz as **3 consultas** (médico→FULL, estagiário→PARTIAL, pesquisador→coorte), renderizando conforme o nível retornado.
-   - **Arquivos-alvo:** `frontend/` (hoje só `.gitkeep`) · client `hospital-frontend` já existe no `keycloak/realm-export.json` (`redirectUris`/`webOrigins` = `http://localhost:*`).
-   - **DoD:** loga com `med.cardoso`/`est.almeida`/`pesq.souza`, envia `Authorization: Bearer` ao gateway, mostra as 3 respostas (inclusive um DENY→403). Serve principalmente ao **vídeo/demo (D7)**, não aos pontos técnicos.
-   - **Destravado:** o M2 fechou. As 3 rotas existem: `GET /fhir/Patient/{id}` (médico/estagiário) e `GET /fhir/cohort/{projetoId}?tipo=ResumoCoorte|ExamesCoorte` (pesquisador).
+8. ~~**Guilherme** · frontend mínimo~~ ✅ **FEITO** (2026-07-12) — foi **além do mínimo**: SPA React/Vite **real** (não mock) com login OIDC no Keycloak, as 3 jornadas contra o gateway (médico→FULL, estagiário→PARTIAL, pesquisador→coorte + lista de projetos), adapter FHIR→UI (`lib/cohort.ts`), **containerizada no K8S** (`k8s/base/frontend.yaml`, `make deploy`). Backend ganhou CORS + `Patient.meta.security` (bônus). Builds verdes. **Resta:** colher os prints E2E (`docs/RUNBOOK-frontend.md` → `docs/evidencias/frontend-real.md`).
 9. **Guilherme** · **Relatório §9 + vídeo** _(Portão 7)_ — escrever incrementalmente, não deixar p/ o fim. Cada trilha entrega a sua seção; **o Guilherme consolida** e entrega.
 
 ---
@@ -282,6 +280,7 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
 - **Postgres 1 réplica = gargalo esperado** — é **feature** p/ a descoberta §7.1, **não** bug. Não "consertar"; medir e documentar.
 - **Postgres é `Deployment`+PVC, não `StatefulSet`** 🟡 — o enunciado pede só "uma instância do PostgreSQL"; com 1 réplica o `Deployment`+PVC é funcionalmente idêntico (persiste no volume). `StatefulSet` só agrega identidade de rede/ordem com **várias** réplicas de banco, que não é o caso. Decisão consciente; **citar no relatório** (não trocar).
 - **Conformidade das consultas nomeadas** ✅ — enunciado §2.1 + footnote ² pede `ResumoClinico`/`HistoricoClinico`/`Exames`/`Medicamentos`/`ListaPacientes` (médico/estagiário) e `ListaProjetos` (pesquisador, item iv). Todas implementadas (2026-07-11): `?tipo=` na rota individual, `GET /fhir/Patient` (searchset), `GET /projects` (JSON). Proto `PatientQuery.username=4` (aditivo). Ver `docs/contratos.md` e `docs/evidencias/consultas-nomeadas.md`.
+- **Frontend real + no K8S** ✅ (2026-07-12) — SPA React/Vite integrada de verdade: login OIDC no Keycloak, 3 jornadas contra o gateway, adapter FHIR→UI (`lib/cohort.ts`), listas de pacientes/projetos. **Backend:** CORS no gateway + `Patient.meta.security` (bônus FHIR). Containerizado (`k8s/base/frontend.yaml`, `make deploy`). Issuer resolvido por alias `keycloak` no hosts (sem tocar no backend/carga). Bônus: coorte com setor+medicamentos (exemplo §2.1 ii). Ver `docs/RUNBOOK-frontend.md`.
 - **Distribuição desigual do trabalho** 🔴 — o **Gabriel** adiantou código de 4 trilhas (authorization=B, seed=D, k8s=A, keycloak=E). O enunciado avalia **"percepção de equilíbrio na distribuição de tarefas"**, e o vídeo expõe quem fez o quê. Mitigação: o *handoff* do §0 + **cada dono faz ao menos um commit substantivo** na peça herdada antes do D7.
 - ~~**Dependência Arthur → Carlos**~~ ✅ **eliminada** — o fix de LB virou **toggle de runtime** (`make grpc-lb-on|off`) em vez de edição destrutiva. Os dois estados coexistem no repo; o Carlos roda as baterias na ordem que quiser. Resta uma pegadinha: como o **default passou a ser o correto**, a rodada "antes" do §7.3 exige `make grpc-lb-off` **explícito**.
 - **Prazo: 1 semana** — priorizar trilhas **A (K8S), C (dados/transform), D (carga)** — são os 80% (§2.1). Frontend rico e FHIR 100% são os primeiros cortes (§ ordem de corte).
@@ -298,7 +297,7 @@ sem k6 + gráficos não há número medido. Se o prazo apertar, o grupo inteiro 
 | **20%** entregas | Relatório §9.6 estruturado | ⬜ | **Guilherme** consolida; cada trilha escreve a sua seção, incrementalmente |
 | | Vídeo 4–6 min/aluno | ⬜ | todos aparecem; fechar com as 3 descobertas |
 | | README reproduzível (`make …`) | 🟡 | falta `make demo` + fases de carga |
-| | Frontend mínimo (login OIDC + 3 consultas, §9.1) | ⬜ | P2, baixo peso; serve ao vídeo/demo; 1º a cortar |
+| | Frontend (login OIDC + 3 consultas, §9.1) | ✅ | **real** + containerizado no K8S; bônus: `meta.security`, coorte rica; 🚧 prints |
 | **➕** bônus | Tracing OTel+Tempo | ✅ ➕ | tooling pronto (`make tracing`); falta screenshot |
 | | Loki + logs JSON | ✅ ➕ | `make loki`; falta screenshot |
 | | postgres-exporter | ✅ ➕ | tooling pronto (`make deploy`); falta screenshot sob carga |
