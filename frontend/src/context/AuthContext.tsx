@@ -4,6 +4,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react"
@@ -46,6 +47,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [secondsRemaining, setSecondsRemaining] = useState(3600) // 1 hora padrão
   const [tokenClaims, setTokenClaims] = useState<Record<string, any>>({})
   const [token, setToken] = useState<string | undefined>(undefined)
+  const initializationRef = useRef(false)
 
   // Atualiza o tempo restante da sessão
   useEffect(() => {
@@ -73,6 +75,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [isAuthenticated])
 
   useEffect(() => {
+    if (initializationRef.current) return
+    initializationRef.current = true
+
     // Registra a data/hora do último login
     if (!localStorage.getItem(LAST_LOGIN_KEY)) {
       localStorage.setItem(LAST_LOGIN_KEY, new Date().toLocaleString("pt-BR"))
