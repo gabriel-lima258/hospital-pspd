@@ -147,12 +147,12 @@ SERVICES = api-gateway authorization patient-data data-transform
 images:
 	@for s in $(SERVICES); do \
 	  echo ">> docker build hospital/$$s:dev"; \
-	  docker build -t hospital/$$s:dev -f services/$$s/Dockerfile . || exit 1; \
+	  docker build --provenance=false -t hospital/$$s:dev -f services/$$s/Dockerfile . || exit 1; \
 	  echo ">> kind load hospital/$$s:dev"; \
 	  kind load docker-image hospital/$$s:dev --name $(KIND_CLUSTER) || exit 1; \
 	done
 	@echo ">> docker build hospital/frontend:dev (contexto = ./frontend)"
-	docker build -t hospital/frontend:dev -f frontend/Dockerfile frontend || exit 1
+	docker build --provenance=false -t hospital/frontend:dev -f frontend/Dockerfile frontend || exit 1
 	@echo ">> kind load hospital/frontend:dev"
 	kind load docker-image hospital/frontend:dev --name $(KIND_CLUSTER) || exit 1
 

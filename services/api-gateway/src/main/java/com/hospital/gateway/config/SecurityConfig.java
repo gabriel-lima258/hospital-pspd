@@ -35,12 +35,14 @@ import com.hospital.gateway.ratelimit.RateLimitProperties;
 public class SecurityConfig {
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http, RateLimitProperties rateLimitProps,
-            CorsConfigurationSource corsSource) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http, RateLimitProperties rateLimitProps)
+            throws Exception {
         http
             // CORS antes de tudo: o preflight OPTIONS é respondido pelo CorsFilter e não passa pelo
             // AccessLog/RateLimit nem exige token (o browser não manda o Bearer no preflight).
-            .cors(cors -> cors.configurationSource(corsSource))
+            // withDefaults() resolve o CorsConfigurationSource POR NOME (bean `corsConfigurationSource`),
+            // evitando a ambiguidade com o `mvcHandlerMappingIntrospector` (que também é um desses).
+            .cors(Customizer.withDefaults())
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/actuator/**").permitAll()

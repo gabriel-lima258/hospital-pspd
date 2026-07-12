@@ -87,3 +87,7 @@ Salvar prints em `docs/evidencias/frontend-real.md`.
 - **401 após login** → alias `keycloak` ausente no hosts (issuer não bate) ou port-forward do keycloak fora do ar.
 - **Login não abre** → `VITE_KEYCLOAK_URL` deve ser `http://keycloak:8080` (com o alias), não `localhost`.
 - **Tela mockada / troca de role por botão** → está em modo demo; garanta `VITE_DEMO_MODE=false` e sem `.env.local` de demo.
+- **`deploy/frontend not found` no `make redeploy`** → o manifesto do frontend nunca foi aplicado; `make redeploy` já faz `kubectl apply -f k8s/base/frontend.yaml` antes do restart. Na 1ª vez, prefira `make deploy` (aplica todo o `k8s/base`).
+- **Pod em `CrashLoopBackOff`/`Exit 1` logo no boot** → falha de contexto Spring; `kubectl logs -l app=<svc> --tail=120` mostra o `Caused by`. (Já resolvido: ambiguidade de bean CORS — ver §7 do `CHECKLIST.md`.)
+- **Pod em `ErrImageNeverPull`/`CreateContainerError`** com a imagem "already present" → attestation manifest do buildkit; `make images` builda com `--provenance=false` para evitar. Rebuild + `kubectl delete pod -l app=<svc>`.
+- **Nós kind `NotReady`/pod preso em `Terminating` após reiniciar a máquina** → cluster stale; o mais limpo é recriar: `make cluster-down && make cluster && make deploy && make seed`.
