@@ -1,7 +1,7 @@
 # Registra o Tempo como datasource no Grafana do kube-prometheus-stack (mesmo mecanismo do
 # loki-datasource.yaml: ConfigMap com label `grafana_datasource: "1"` que o sidecar do kps carrega).
-# O Tempo (chart grafana/tempo) expõe o Service `tempo:3100` (query) na namespace monitoring e recebe
-# OTLP em :4317.
+# O Tempo (chart grafana/tempo) expõe o Service `tempo:3200` (API de query HTTP) na namespace
+# monitoring e recebe OTLP em :4317. (3100 é o Loki — não confundir.)
 #
 # tracesToLogsV2 liga o Tempo ao Loki: no trace, o botão "Logs for this span" consulta o Loki
 # filtrando por trace_id — que o OTel agent injeta no MDC e o AccessLogFilter do gateway já emite em
@@ -21,7 +21,7 @@ data:
         type: tempo
         uid: tempo
         access: proxy
-        url: http://tempo.monitoring.svc.cluster.local:3100
+        url: http://tempo.monitoring.svc.cluster.local:3200
         isDefault: false
         jsonData:
           tracesToLogsV2:

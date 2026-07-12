@@ -125,9 +125,10 @@ dashboard: check-cluster-tools
 tracing: check-cluster-tools
 	helm repo add grafana https://grafana.github.io/helm-charts --force-update
 	helm repo update
-	@echo ">> instalando Tempo (monolítico, receiver OTLP em :4317)"
+	@echo ">> instalando Tempo (monolítico, receiver OTLP grpc:4317 + http:4318)"
 	helm upgrade --install tempo grafana/tempo -n monitoring --create-namespace \
-	  --set 'tempo.receivers.otlp.protocols.grpc.endpoint=0.0.0.0:4317'
+	  -f k8s/observability/tempo-values.yaml
+	kubectl -n monitoring rollout status statefulset/tempo --timeout=120s
 	kubectl apply -f k8s/observability/tempo-datasource.yaml
 	@echo ">> ligando o export de traces nos 4 serviços (OTEL_SDK_DISABLED=false)"
 	@for s in $(SERVICES); do kubectl set env deploy/$$s OTEL_SDK_DISABLED=false; done
@@ -187,13 +188,14 @@ redeploy: check-cluster-tools images
 front: check-cluster-tools
 	kubectl port-forward svc/frontend 8088:80
 
-# Sobe os 3 port-forwards do frontend REAL em background (keycloak:8080, gateway:9000, frontend:8088).
-# `nohup` faz sobreviverem ao término do make. Logs em /tmp/pf-*.log. Parar: `make forward-stop`.
+# Sobe os 3 port-forwards do frontend REAL em background COM AUTO-RECONEXÃO (o kubectl port-forward
+# cai sozinho em reset/idle/rollout e não reconecta; o `while` relança). `nohup` faz sobreviver ao make.
+# Logs em /tmp/pf-*.log. Parar: `make forward-stop` (o pkill casa tanto o kubectl quanto o laço `sh`).
 forward: check-cluster-tools
-	@echo ">> port-forwards em background (keycloak:8080, api-gateway:9000, frontend:8088)"
-	@nohup kubectl port-forward svc/keycloak    8080:8080 >/tmp/pf-keycloak.log 2>&1 &
-	@nohup kubectl port-forward svc/api-gateway 9000:9000 >/tmp/pf-gateway.log  2>&1 &
-	@nohup kubectl port-forward svc/frontend    8088:80   >/tmp/pf-frontend.log 2>&1 &
+	@echo ">> port-forwards em background com auto-reconexão (keycloak:8080, api-gateway:9000, frontend:8088)"
+	@nohup sh -c 'while true; do kubectl port-forward svc/keycloak    8080:8080 >>/tmp/pf-keycloak.log 2>&1; sleep 1; done' >/dev/null 2>&1 &
+	@nohup sh -c 'while true; do kubectl port-forward svc/api-gateway 9000:9000 >>/tmp/pf-gateway.log  2>&1; sleep 1; done' >/dev/null 2>&1 &
+	@nohup sh -c 'while true; do kubectl port-forward svc/frontend    8088:80   >>/tmp/pf-frontend.log 2>&1; sleep 1; done' >/dev/null 2>&1 &
 	@sleep 2
 	@echo "OK  ·  Frontend http://localhost:8088  ·  Keycloak http://localhost:8080  ·  Gateway http://localhost:9000"
 	@echo "Parar: make forward-stop"

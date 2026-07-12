@@ -1,0 +1,11 @@
+# Values do chart grafana/tempo (single-binary) — habilita EXPLICITAMENTE o receiver OTLP em 0.0.0.0.
+# Sem o bloco completo de `protocols`, o Tempo não abre a porta 4317 e o OTel agent recebe
+# "Connection refused" (o Service expõe 4317, mas nada escuta). Ver make tracing.
+tempo:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
