@@ -46,7 +46,7 @@
       "serviceAccountsEnabled": false,
       "fullScopeAllowed": true,
       "redirectUris": ["http://localhost:*"],
-      "webOrigins": ["http://localhost:*"]
+      "webOrigins": ["*"]
     }
   ],
 

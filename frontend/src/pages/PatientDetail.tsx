@@ -103,6 +103,26 @@ export const PatientDetail: React.FC = () => {
   const observations = useMemo(() => clinicalData ? extractObservations(clinicalData) : [], [clinicalData])
   const medications = useMemo(() => clinicalData ? extractMedications(clinicalData) : [], [clinicalData])
 
+  // Dataset do prontuário para o ExportButton (CSV/Excel/PDF). Sem isto o export levava só o ID do
+  // Patient — daí vir "vazio". Achata diagnósticos + exames + medicamentos da aba carregada.
+  const exportColumns = [
+    { key: "tipo", label: "Tipo" },
+    { key: "descricao", label: "Descrição" },
+    { key: "valor", label: "Valor" },
+    { key: "data", label: "Data" },
+  ]
+  const exportRows = useMemo(() => {
+    const fmt = (d?: string) => (d ? formatDate(d) : "")
+    const rows: Record<string, string>[] = []
+    conditions.forEach((c) =>
+      rows.push({ tipo: "Diagnóstico", descricao: c.code?.text ?? "—", valor: c.severity?.text ?? "", data: fmt(c.recordedDate ?? c.onsetDateTime) }))
+    observations.forEach((o) =>
+      rows.push({ tipo: "Exame", descricao: o.code?.text ?? "—", valor: `${o.valueQuantity?.value ?? o.valueString ?? ""} ${o.valueQuantity?.unit ?? ""}`.trim(), data: fmt(o.effectiveDateTime) }))
+    medications.forEach((m) =>
+      rows.push({ tipo: "Medicamento", descricao: m.medicationCodeableConcept?.text ?? "—", valor: m.dosageInstruction?.[0]?.text ?? "", data: fmt(m.authoredOn) }))
+    return rows
+  }, [conditions, observations, medications])
+
 
   const encounters = useMemo(() => {
     return [
@@ -145,7 +165,7 @@ export const PatientDetail: React.FC = () => {
           <ArrowLeft className="size-4" />
           Voltar para lista
         </button>
-        <ExportButton data={[patient]} columns={[{ key: "id", label: "ID" }]} filename={`prontuario-${patient.id}`} title="Dossiê Médico FHIR" />
+        <ExportButton data={exportRows} columns={exportColumns} filename={`prontuario-${patient.id}`} title={`Prontuário FHIR — ${patient.name?.[0]?.text ?? patient.id}`} />
       </div>
 
       {/* Patient overview card */}

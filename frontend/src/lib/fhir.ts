@@ -62,10 +62,12 @@ export function genderLabel(gender?: string): string {
   }
 }
 
-/** Extrai um identificador do paciente pelo rótulo do tipo (ex.: "CPF"). */
+/** Extrai um identificador do paciente pelo rótulo do tipo (ex.: "CPF").
+ * Casa por `type.text` (ex.: "CPF") OU por `system` (ex.: "urn:oid:cpf") — o backend usa system. */
 export function findIdentifier(patient: FhirPatient, typeText: string): string | undefined {
+  const t = typeText.toUpperCase()
   return patient.identifier?.find(
-    (i) => i.type?.text?.toUpperCase() === typeText.toUpperCase(),
+    (i) => i.type?.text?.toUpperCase() === t || (i.system?.toUpperCase().includes(t) ?? false),
   )?.value
 }
 

@@ -14,9 +14,11 @@ export const FHIRViewer: React.FC<FHIRViewerProps> = ({ resource, title = "Recur
   const resourceType = resource?.resourceType ?? "Desconhecido"
   const resourceId = resource?.id ?? "Sem ID"
 
-  // Função recursiva para renderizar os campos
+  // Alterna o nó. Nós expandidos por default têm `undefined` no mapa (o render usa `!== false`), então
+  // NÃO dá para usar `!prev[path]` (viraria `!undefined === true` e o 1º clique não colapsaria). Aqui o
+  // novo estado é "expandir só se estava colapsado" → `prev[path] === false`.
   const toggleNode = (path: string) => {
-    setExpandedKeys((prev) => ({ ...prev, [path]: !prev[path] }))
+    setExpandedKeys((prev) => ({ ...prev, [path]: prev[path] === false }))
   }
 
   const handleCopy = () => {
@@ -57,7 +59,13 @@ export const FHIRViewer: React.FC<FHIRViewerProps> = ({ resource, title = "Recur
   }
 
   const handleCollapseAll = () => {
-    setExpandedKeys({ "": true })
+    // Precisa marcar TODOS os caminhos como false (não basta limpar o mapa: ausência = expandido).
+    // Só a raiz fica aberta, para o cabeçalho do recurso continuar visível.
+    const next: Record<string, boolean> = {}
+    getAllPaths(resource).forEach((path) => {
+      next[path] = path === ""
+    })
+    setExpandedKeys(next)
   }
 
   const isHighlighted = (value: any, keyName: string): boolean => {

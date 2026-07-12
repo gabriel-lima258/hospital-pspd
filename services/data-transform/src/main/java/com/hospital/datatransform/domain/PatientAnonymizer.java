@@ -88,11 +88,12 @@ public final class PatientAnonymizer {
         List<Map<String, Object>> ids = new ArrayList<>();
         String cpf = texto(demographics, "cpf");
         String cns = texto(demographics, "cns");
+        // identifier.type.text ("CPF"/"CNS") além do system — é o rótulo padrão FHIR que a UI lê.
         if (!cpf.isEmpty()) {
-            ids.add(Map.of("system", "urn:oid:cpf", "value", cpf));
+            ids.add(Map.of("system", "urn:oid:cpf", "value", cpf, "type", Map.of("text", "CPF")));
         }
         if (!cns.isEmpty()) {
-            ids.add(Map.of("system", "urn:oid:cns", "value", cns));
+            ids.add(Map.of("system", "urn:oid:cns", "value", cns, "type", Map.of("text", "CNS")));
         }
         return ids;
     }
