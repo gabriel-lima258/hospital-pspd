@@ -9,15 +9,12 @@ Passo a passo para rodar o frontend **integrado de verdade** ao backend no clust
 
 ## 0. Pré-requisitos (uma vez)
 
-### 0a. Alias do Keycloak no hosts (resolve o issuer)
-O token traz `iss=http://keycloak:8080`. Pra o **browser** e o **cluster** verem o MESMO host (sem mexer
-no backend), aponte `keycloak` para o loopback:
-
-```
-# Windows: C:\Windows\System32\drivers\etc\hosts   (abrir como Administrador)
-# Linux/Mac: /etc/hosts   (sudo)
-127.0.0.1 keycloak
-```
+### 0a. Issuer via split-horizon (NÃO precisa editar hosts)
+O browser acessa o Keycloak em **`localhost:8080`** (port-forward) e o token sai com
+`iss=http://localhost:8080/realms/hospital` (`KC_HOSTNAME`). O gateway **aceita esse issuer** mas busca
+as **chaves no Service interno** `keycloak:8080` (`JWT_JWK_SET_URI`) — padrão split-horizon do Keycloak,
+usado em prod atrás de ingress. Resultado: login OIDC no browser funciona **sem alias no hosts** e sem
+acoplar o gateway ao host do browser. (Config em `k8s/base/{keycloak,api-gateway}.yaml` + `SecurityConfig`.)
 
 ### 0b. Subir tudo com o frontend
 ```bash
@@ -32,12 +29,21 @@ kubectl get pods # db, keycloak, os 4 serviços e frontend Running/Ready
 ## 1. Port-forwards (3 terminais, ou background)
 
 ```bash
-kubectl port-forward svc/keycloak    8080:8080   # OIDC (browser abre via alias keycloak:8080)
+make forward     # sobe os 3 túneis em background: keycloak:8080, gateway:9000, frontend:8088
+# parar depois: make forward-stop
+```
+
+Ou manualmente (cada um num terminal, foreground):
+```bash
+kubectl port-forward svc/keycloak    8080:8080   # OIDC (browser abre em http://localhost:8080)
 kubectl port-forward svc/api-gateway 9000:9000   # REST/FHIR (VITE_API_GATEWAY_URL)
 make front                                        # svc/frontend 8088:80
 ```
 
-As portas casam com `frontend/.env` (real): gateway `:9000`, keycloak `http://keycloak:8080`.
+**Por que port-forward?** Os Services são `ClusterIP` — só existem dentro do cluster (kind roda em
+Docker). O host não enxerga ClusterIP; o port-forward é o túnel host→cluster. As portas casam com
+`frontend/.env`: gateway `:9000`, keycloak `http://localhost:8080`. Os túneis ficam **rodando**
+enquanto usa o app.
 
 ---
 
@@ -84,8 +90,8 @@ Salvar prints em `docs/evidencias/frontend-real.md`.
 
 - **Rotas 404 / `?tipo=` ignorado** → imagem velha; rode `make redeploy`.
 - **Erro de CORS no console** → origem fora de `http://localhost:*`; ajuste `GATEWAY_CORS_ORIGINS` no gateway.
-- **401 após login** → alias `keycloak` ausente no hosts (issuer não bate) ou port-forward do keycloak fora do ar.
-- **Login não abre** → `VITE_KEYCLOAK_URL` deve ser `http://keycloak:8080` (com o alias), não `localhost`.
+- **401 após login** → issuer não bate: confirme `KC_HOSTNAME=http://localhost:8080` no keycloak e `JWT_ISSUER_URI`/`JWT_JWK_SET_URI` no gateway (split-horizon). Ou port-forward do keycloak fora do ar.
+- **Login não abre / "Falha ao inicializar o Keycloak"** → port-forward do keycloak parado, ou `VITE_KEYCLOAK_URL` ≠ `http://localhost:8080`. Teste `curl -i http://localhost:8080/realms/hospital/.well-known/openid-configuration` (com o port-forward rodando) → deve dar 200.
 - **Tela mockada / troca de role por botão** → está em modo demo; garanta `VITE_DEMO_MODE=false` e sem `.env.local` de demo.
 - **`deploy/frontend not found` no `make redeploy`** → o manifesto do frontend nunca foi aplicado; `make redeploy` já faz `kubectl apply -f k8s/base/frontend.yaml` antes do restart. Na 1ª vez, prefira `make deploy` (aplica todo o `k8s/base`).
 - **Pod em `CrashLoopBackOff`/`Exit 1` logo no boot** → falha de contexto Spring; `kubectl logs -l app=<svc> --tail=120` mostra o `Caused by`. (Já resolvido: ambiguidade de bean CORS — ver §7 do `CHECKLIST.md`.)

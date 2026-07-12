@@ -124,10 +124,15 @@ browser chamar a API cross-origin com `Authorization`. Origens por `allowedOrigi
 `http://localhost:*`, env `GATEWAY_CORS_ORIGINS`), métodos `GET,OPTIONS`, sem credenciais (usa Bearer,
 não cookie). O preflight `OPTIONS` é respondido antes do AccessLog/RateLimit e não exige token.
 
-**Login OIDC no browser (issuer).** O token traz `iss=http://keycloak:8080`. Para o browser e o cluster
-resolverem o **mesmo** host (sem tocar no backend), o frontend usa um alias `127.0.0.1 keycloak` no
-`hosts` + port-forward do Keycloak — assim o `iss` bate com o `issuer-uri` do gateway. O fluxo k6/curl
-(`get-token.sh`) fica intacto. Ver `docs/RUNBOOK-frontend.md`.
+**Login OIDC no browser (split-horizon).** O browser alcança o Keycloak em `http://localhost:8080`
+(port-forward) e o token sai com `iss=http://localhost:8080/realms/hospital` (`KC_HOSTNAME`). O gateway
+**valida esse issuer** (`JWT_ISSUER_URI`) mas **busca as chaves JWKS no Service interno**
+`keycloak:8080` (`JWT_JWK_SET_URI`) — padrão split-horizon do Keycloak (frontend público + backchannel
+interno), o mesmo usado em prod atrás de ingress. Assinatura, `iss` e `exp` seguem validados; nada de
+segurança é afetado. Evita editar `/etc/hosts`. `SecurityConfig.buildDelegate` faz o dispatch (jwk-set-uri
+presente → chaves internas + validação de issuer; ausente → discovery, comportamento compose/curl).
+`localhost` como host do issuer é acomodação de ambiente local (em prod seria um domínio real). Ver
+`docs/RUNBOOK-frontend.md`.
 
 **Mapa gRPC→HTTP global** (`GrpcHttpExceptionHandler`, `@RestControllerAdvice`) — cobre as rotas
 **sem** `catch` local, hoje a de prontuário `GET /fhir/Patient/{id}`. Traduz o código do

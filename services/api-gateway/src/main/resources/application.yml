@@ -5,9 +5,13 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          # Validação de JWT contra o Keycloak (§4.7). O JwtDecoder em SecurityConfig lê este valor
-          # e resolve o issuer de forma lazy (não acopla o boot do Gateway ao Keycloak).
-          issuer-uri: http://keycloak:8080/realms/hospital
+          # Validação de JWT contra o Keycloak (§4.7). O JwtDecoder em SecurityConfig resolve de forma
+          # lazy (não acopla o boot ao Keycloak). `issuer-uri` = o `iss` esperado no token.
+          issuer-uri: ${JWT_ISSUER_URI:http://keycloak:8080/realms/hospital}
+          # Quando preenchido, busca as chaves AQUI (Service interno) e valida o iss contra issuer-uri —
+          # permite o browser usar localhost:8080 sem editar hosts (ver docs/RUNBOOK-frontend.md).
+          # Vazio (default) = discovery pelo issuer (compose/curl).
+          jwk-set-uri: ${JWT_JWK_SET_URI:}
 
 # gRPC CLIENT (net.devh) — canais criados lazy na 1ª injeção de stub (sem conexão no boot).
 #

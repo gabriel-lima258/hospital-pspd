@@ -22,8 +22,11 @@ spec:
             - { name: KC_BOOTSTRAP_ADMIN_USERNAME, value: admin }
             - { name: KC_BOOTSTRAP_ADMIN_PASSWORD, value: admin }
             - { name: KC_HEALTH_ENABLED,           value: "true" }
-            # Issuer estável (hostname v2 do KC 26): o iss do token é sempre este host.
-            - { name: KC_HOSTNAME,                 value: "http://keycloak:8080" }
+            # Frontend URL (KC 26 hostname v2) → define o `iss` do token e as URLs de login/redirect.
+            # localhost:8080 porque o BROWSER alcança o Keycloak por port-forward em localhost (sem editar
+            # hosts). O backchannel (JWKS) é interno: o gateway busca as chaves em keycloak:8080 e valida
+            # o iss localhost:8080 (split-horizon; ver JWT_JWK_SET_URI no api-gateway e RUNBOOK-frontend).
+            - { name: KC_HOSTNAME,                 value: "http://localhost:8080" }
           ports:
             - { containerPort: 8080, name: http }
             - { containerPort: 9000, name: management }

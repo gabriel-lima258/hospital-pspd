@@ -12,6 +12,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtException;
+import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
@@ -80,10 +81,17 @@ public class SecurityConfig {
      * de forma EAGER — se o Keycloak ainda não subiu, o boot do Gateway falha. Este wrapper adia a
      * construção do decoder real para a 1ª validação de token; até lá o Keycloak já está pronto.
      * Declarar este bean também faz o auto-config eager do issuer-uri recuar (@ConditionalOnMissingBean).
+     *
+     * <p><b>Dois modos</b> (config, não código): com {@code jwk-set-uri} preenchido, busca as chaves
+     * nesse endereço (o Service interno do cluster) e valida o {@code iss} contra {@code issuer-uri} —
+     * isso desacopla o host que o BROWSER usa (ex.: localhost:8080) do host que o GATEWAY alcança
+     * (keycloak:8080), sem editar o /etc/hosts. Sem {@code jwk-set-uri}, cai no discovery pelo issuer
+     * (comportamento do compose/curl).
      */
     @Bean
     public JwtDecoder jwtDecoder(
-            @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}") String issuer) {
+            @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}") String issuer,
+            @Value("${spring.security.oauth2.resourceserver.jwt.jwk-set-uri:}") String jwkSetUri) {
         return new JwtDecoder() {
             private volatile JwtDecoder delegate;
 
@@ -93,7 +101,7 @@ public class SecurityConfig {
                 if (d == null) {
                     synchronized (this) {
                         if (delegate == null) {
-                            delegate = NimbusJwtDecoder.withIssuerLocation(issuer).build();
+                            delegate = buildDelegate(issuer, jwkSetUri);
                         }
                         d = delegate;
                     }
@@ -101,5 +109,15 @@ public class SecurityConfig {
                 return d.decode(token);
             }
         };
+    }
+
+    /** Monta o decoder real: por jwk-set-uri (+ validação de issuer) ou por discovery do issuer. */
+    private static JwtDecoder buildDelegate(String issuer, String jwkSetUri) {
+        if (jwkSetUri != null && !jwkSetUri.isBlank()) {
+            NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
+            decoder.setJwtValidator(JwtValidators.createDefaultWithIssuer(issuer));
+            return decoder;
+        }
+        return NimbusJwtDecoder.withIssuerLocation(issuer).build();
     }
 }

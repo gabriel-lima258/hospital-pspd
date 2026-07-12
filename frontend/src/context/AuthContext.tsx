@@ -128,6 +128,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const authenticated = await keycloak.init({
           onLoad: "login-required", // Redireciona para o login caso não autenticado
           pkceMethod: "S256",
+          // Desliga o iframe de checagem de sessão (usa cookie de 3º-party, bloqueado por browsers
+          // modernos → "Timeout when waiting for 3rd party check iframe message"). A expiração do
+          // token já é controlada localmente (setInterval sobre tokenParsed.exp) + updateToken.
+          checkLoginIframe: false,
         })
 
         setIsAuthenticated(authenticated)

@@ -36,6 +36,11 @@ spec:
             # justamente o que a descoberta §7.2 mede — reduzir, não zerar.
             - name: JAVA_TOOL_OPTIONS
               value: "-Dsun.net.inetaddr.ttl=5 -Dsun.net.inetaddr.negative.ttl=0"
+            # Split-horizon do Keycloak: aceita o iss que o browser gera (localhost:8080), mas busca as
+            # chaves de assinatura no Service INTERNO (keycloak:8080), que o pod alcança. Assim o login
+            # OIDC no browser funciona sem editar /etc/hosts. Ver SecurityConfig + docs/RUNBOOK-frontend.md.
+            - { name: JWT_ISSUER_URI,  value: "http://localhost:8080/realms/hospital" }
+            - { name: JWT_JWK_SET_URI, value: "http://keycloak:8080/realms/hospital/protocol/openid-connect/certs" }
           # As envs GRPC_*_ADDRESS / GRPC_LB_POLICY NÃO são declaradas aqui de propósito: assim
           # `kubectl apply` não as gerencia e o valor posto por `make grpc-lb-off` sobrevive.
           ports:

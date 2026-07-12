@@ -1,5 +1,5 @@
 # Makefile — Hospital Universitário (PSPD/UnB). Tudo que repete vira alvo (regra de ouro 4).
-.PHONY: up rebuild down logs cluster cluster-down grafana front check-cluster-tools images deploy redeploy \
+.PHONY: up rebuild down logs cluster cluster-down grafana front forward forward-stop check-cluster-tools images deploy redeploy \
         seed seed-local grpc-lb-on grpc-lb-off hpa-on hpa-off scale pods-wide watch-hpa load plot loki dashboard tracing tracing-off demo help
 
 # Nome do cluster kind (usado por cluster / cluster-down / deploy futuro).
@@ -15,6 +15,8 @@ help:
 	@echo "  make cluster-down - deleta o cluster kind ($(KIND_CLUSTER))"
 	@echo "  make grafana     - port-forward do Grafana em http://localhost:3000 (admin + senha do secret)"
 	@echo "  make front       - port-forward do frontend em http://localhost:8088 (SPA React)"
+	@echo "  make forward     - sobe os 3 port-forwards do frontend real em background (keycloak/gateway/frontend)"
+	@echo "  make forward-stop- encerra os port-forwards do frontend"
 	@echo "  make loki        - Loki + Promtail (bônus): agrega logs JSON no Grafana (LogQL)"
 	@echo "  make dashboard   - importa o dashboard RED/USE no Grafana do kps (fase e)"
 	@echo "  make tracing     - Tempo + OTel agent (bônus): liga traces REST→gRPC→SQL no Grafana"
@@ -180,10 +182,27 @@ redeploy: check-cluster-tools images
 	@for s in $(SERVICES) frontend; do kubectl rollout restart deploy/$$s; done
 	@for s in $(SERVICES) frontend; do kubectl rollout status deploy/$$s --timeout=240s || exit 1; done
 
-# Port-forward do frontend (SPA) em http://localhost:8088. Requer também os port-forwards de
-# api-gateway (9000) e keycloak (8080, com '127.0.0.1 keycloak' no hosts) — ver docs/RUNBOOK-frontend.md.
+# Port-forward do frontend (SPA) em http://localhost:8088 (foreground, bloqueia). Para subir os 3
+# túneis do frontend real de uma vez em background, use `make forward`.
 front: check-cluster-tools
 	kubectl port-forward svc/frontend 8088:80
+
+# Sobe os 3 port-forwards do frontend REAL em background (keycloak:8080, gateway:9000, frontend:8088).
+# `nohup` faz sobreviverem ao término do make. Logs em /tmp/pf-*.log. Parar: `make forward-stop`.
+forward: check-cluster-tools
+	@echo ">> port-forwards em background (keycloak:8080, api-gateway:9000, frontend:8088)"
+	@nohup kubectl port-forward svc/keycloak    8080:8080 >/tmp/pf-keycloak.log 2>&1 &
+	@nohup kubectl port-forward svc/api-gateway 9000:9000 >/tmp/pf-gateway.log  2>&1 &
+	@nohup kubectl port-forward svc/frontend    8088:80   >/tmp/pf-frontend.log 2>&1 &
+	@sleep 2
+	@echo "OK  ·  Frontend http://localhost:8088  ·  Keycloak http://localhost:8080  ·  Gateway http://localhost:9000"
+	@echo "Parar: make forward-stop"
+
+forward-stop:
+	-@pkill -f 'kubectl port-forward svc/keycloak'    2>/dev/null || true
+	-@pkill -f 'kubectl port-forward svc/api-gateway' 2>/dev/null || true
+	-@pkill -f 'kubectl port-forward svc/frontend'    2>/dev/null || true
+	@echo "port-forwards do frontend encerrados."
 
 # ── Seed de volume (Trilha D, §4.4) ──────────────────────────────────────────
 # nº de pacientes; encounters/events derivam disto no seed.py. Override: make seed SCALE=200000
