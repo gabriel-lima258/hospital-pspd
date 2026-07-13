@@ -21,6 +21,8 @@
 
 ---
 
+> 🧭 **Passo a passo dos blocos 1+2 com os 15 prints (o quê/quando/destino):** [`RUNBOOK-carga-hpa.md`](RUNBOOK-carga-hpa.md).
+
 ## 1. ⭐🔴 CARGA k6 — os 80% da nota (Carlos) · Portão 4/5
 
 Nenhum número medido ainda. Sem isto não há nota técnica.
