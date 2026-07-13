@@ -53,6 +53,14 @@ for s in api-gateway authorization patient-data data-transform; do
   kubectl rollout status deploy/"$s" --timeout=120s >/dev/null
 done
 
+# ESTABILIZAÇÃO pós-setup: `Ready` (probe) NÃO significa gRPC re-resolvido/aquecido. Após um scale ou
+# troca de LB, o gateway leva ~até 30s para re-resolver o DNS dos Services headless (EndpointSlice →
+# registro A → cache da JVM → grpc-java) e as JVMs estão cold — medir aqui contamina a rodada com
+# 504/hangs que são da JANELA de transição, não da app em regime (é a descoberta §7.2). Espera fixa:
+STABILIZE_S="${STABILIZE_S:-45}"
+echo ">>> estabilização ${STABILIZE_S}s (re-resolução DNS + warm dos pods após o setup — §7.2)"
+sleep "$STABILIZE_S"
+
 # ── 2. Port-forwards efêmeros (Keycloak p/ tokens, gateway p/ k6) ─────────────
 PF_PIDS=()
 cleanup() { for p in "${PF_PIDS[@]:-}"; do kill "$p" 2>/dev/null || true; done; }
@@ -85,9 +93,13 @@ for VUS in $VU_LEVELS; do
      --quiet --no-summary "$HERE/k6/scenario.js" >/dev/null 2>&1 || true
 
   echo "  medição 3min"
+  # `|| true`: um threshold estourado (ex.: taxa de erro > 5% num cenário ruim de propósito, como o
+  # 3replicas-off do §7.3) faz o k6 sair 99. Sem isto, o `set -e` abortaria a bateria e perderíamos os
+  # níveis seguintes — mas o cenário "ruim" é justamente o dado que queremos medir. O summary é
+  # exportado mesmo com threshold estourado.
   k6 run -e VUS="$VUS" -e BASE="$BASE" -e SCENARIO="$SCENARIO" \
      --summary-export "$OUTDIR/${SCENARIO}_vus${VUS}.json" \
-     "$HERE/k6/scenario.js"
+     "$HERE/k6/scenario.js" || true
 
   # coleta PromQL (opcional — só se Prometheus estiver acessível)
   if [ -x "$HERE/collect-metrics.sh" ]; then

@@ -30,6 +30,22 @@ api.interceptors.request.use(
   (error: unknown) => Promise.reject(error),
 )
 
+// Retry em falha de REDE (sem resposta HTTP): cobre a janela de ~1-2s em que o `kubectl port-forward`
+// cai e reconecta (o túnel do dev não é estável). Só re-tenta erros SEM `response` (connection refused
+// /timeout), nunca 4xx/5xx do servidor. Todas as rotas são GET (idempotentes) → re-tentar é seguro.
+const MAX_RETRIES = 3
+const RETRY_DELAY_MS = 700
+api.interceptors.response.use(undefined, async (error: any) => {
+  const cfg = error?.config
+  const semResposta = !error?.response // connection refused / network / timeout
+  if (cfg && semResposta && (cfg.__retryCount ?? 0) < MAX_RETRIES) {
+    cfg.__retryCount = (cfg.__retryCount ?? 0) + 1
+    await new Promise((r) => setTimeout(r, RETRY_DELAY_MS))
+    return api(cfg)
+  }
+  return Promise.reject(error)
+})
+
 export default api
 
 /* ------------------------------------------------------------------ */

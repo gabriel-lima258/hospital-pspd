@@ -45,9 +45,12 @@ spec:
             exec: { command: ["pg_isready", "-U", "app", "-d", "hospital"] }
             initialDelaySeconds: 20
             periodSeconds: 10
+          # Postgres é o gargalo esperado (§7.1) — mas precisa SATURAR, não CRASHAR. Com 512Mi a
+          # agregação de coorte (Seq Scan em ~1,3M linhas) × dezenas de conexões dos apps estourava a
+          # memória (OOM) e derrubava o DB, invalidando a medição. Fôlego para saturar graciosamente.
           resources:
-            requests: { cpu: "250m", memory: "256Mi" }
-            limits:   { cpu: "500m", memory: "512Mi" }
+            requests: { cpu: "500m", memory: "512Mi" }
+            limits:   { cpu: "2",    memory: "2Gi" }
       volumes:
         - name: data
           persistentVolumeClaim: { claimName: db-data }

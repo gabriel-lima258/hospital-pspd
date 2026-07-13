@@ -51,9 +51,12 @@ spec:
             periodSeconds: 5
             failureThreshold: 12
           livenessProbe:
-            httpGet: { path: /actuator/health, port: 9000 }
+            # SÓ o liveness-state da JVM (não checa dependências) — ver patient-data.yaml. Ocupado ≠ morto.
+            httpGet: { path: /actuator/health/liveness, port: 9000 }
             initialDelaySeconds: 40
-            periodSeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 6
           resources:
             requests: { cpu: "250m", memory: "512Mi" }   # requests.cpu obrigatório p/ o HPA (D5)
             limits:   { cpu: "1",    memory: "1Gi" }

@@ -32,9 +32,14 @@ spec:
             periodSeconds: 5
             failureThreshold: 12
           livenessProbe:
-            httpGet: { path: /actuator/health, port: 8080 }
+            # SÓ o liveness-state da JVM (não checa DB). Sob carga o /actuator/health completo fica lento
+            # (Postgres saturado, §7.1) e o kubelet mataria um pod só OCUPADO → restart envenena o
+            # round_robin. Timeout/failureThreshold folgados: ocupado ≠ morto.
+            httpGet: { path: /actuator/health/liveness, port: 8080 }
             initialDelaySeconds: 40
-            periodSeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 6
           resources:
             requests: { cpu: "250m", memory: "512Mi" }   # requests.cpu obrigatório p/ o HPA (D5)
             limits:   { cpu: "1",    memory: "1Gi" }

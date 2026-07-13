@@ -8,7 +8,7 @@
 # O mix (coerente com db/seed.py) exercita FULL / PARTIAL / AGG:
 #   med.cardoso (MEDICO)      -> /fhir/Patient/P000001..P001000  (FULL,    vínculo ativo)  ~60%
 #   est.almeida (ESTAGIARIO)  -> /fhir/Patient/P000001..P000200  (PARTIAL, subconjunto)   ~20%
-#   pesq.souza  (PESQUISADOR) -> /fhir/cohort/PRJ01              (AGG,     projeto ALLOW)  ~20%
+#   pesq.souza  (PESQUISADOR) -> /fhir/cohort/PRJ01?tipo=ResumoCoorte (AGG, projeto ALLOW)  ~20%
 # Cada requisição de médico/estagiário sorteia um paciente distinto → espalha a carga por muitas
 # linhas do banco (bater 1 linha só não estressa cache/IO — ver "não faça" do CLAUDE.md).
 #
@@ -54,7 +54,7 @@ for _ in range(n):
                      "endpoint": f"/fhir/Patient/P{pid:06d}"})
     else:                                          # pesquisador AGG — coorte do projeto ALLOW
         pool.append({"jwt": souza, "perfil": "pesquisador",
-                     "endpoint": "/fhir/cohort/PRJ01"})
+                     "endpoint": "/fhir/cohort/PRJ01?tipo=ResumoCoorte"})
 
 with open(out_path, "w") as f:
     json.dump(pool, f)
