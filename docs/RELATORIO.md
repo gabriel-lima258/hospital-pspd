@@ -34,7 +34,7 @@ técnicas e das funcionalidades extras (Loki, tracing com Tempo, postgres-export
 
 ## 2. Metodologia de trabalho
 
-O grupo se organizou em **5 trilhas paralelas**, destravadas por 3 contratos congelados no primeiro
+O grupo se organizou em **4 trilhas paralelas**, destravadas por 3 contratos congelados no primeiro
 dia (`db/schema.sql`, `proto/hospital.proto`, claims do JWT — ver [`contratos.md`](contratos.md)):
 
 | Trilha                       | Responsável | Escopo                                                                                             |
