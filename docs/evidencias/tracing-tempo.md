@@ -40,9 +40,21 @@ parent-based), rate-limiting (teto N/s), tail sampling (erros+lentos sempre, via
 
 ## Evidência
 
-_(pendente — capturar com o tracing ligado sob um pouco de tráfego: (1) screenshot do trace
-multi-serviço aberto no Tempo mostrando os spans dos 4 serviços + o SELECT; (2) screenshot do salto
-"Logs for this span" abrindo a linha `http_access` no Loki. Anexar como PNG.)_
+Capturado 2026-07-12, tracing ligado (`make tracing`) com tráfego real. Busca de traces no Tempo
+(Grafana → Explore → Tempo → Search):
+
+![Tempo Search — traces de GET /fhir/Patient/{id} listados com duração](imagens/traceTempo.png)
+
+Trace multi-serviço aberto — os spans atravessam
+`api-gateway → hospital.Authorization/Check → hospital.PatientData/Fetch → SELECT (JDBC) → hospital.DataTransform/ToFhir`,
+4 serviços num único trace, com o tempo de cada salto:
+
+![Trace GET /fhir/Patient — 4 serviços, spans gRPC e SELECT no Postgres, 1.94s](imagens/traceTempo2.png)
+
+![Trace GET /fhir/Patient/{id} — 24ms, com os SELECTs por tabela (patients, encounters, clinical_events)](imagens/traceTempo3.png)
+
+O salto **trace→log** usa o mesmo `trace_id` que aparece na linha `http_access` do Loki — ver
+`loki-logql.md` (imagem da linha expandida com `trace_id`/`span_id`).
 
 ## Nota de método (§7.2)
 

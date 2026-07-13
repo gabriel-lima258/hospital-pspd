@@ -31,7 +31,7 @@ dependencies {
     compileOnly 'org.apache.tomcat:annotations-api:6.0.53'
 }
 
-// O .proto mora em proto/hospital.proto (raiz do módulo), conforme §2.4/§4.6 do roteiro,
+// O .proto mora em proto/hospital.proto (raiz do módulo),
 // e não no default src/main/proto — por isso apontamos o srcDir para a raiz do módulo.
 // include '*.proto' garante que só os contratos do nível-raiz sejam compilados como fonte.
 sourceSets {

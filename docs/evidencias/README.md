@@ -1,36 +1,45 @@
 # Evidências
 
+Saídas de comando, prints e CSVs que sustentam o [`docs/RELATORIO.md`](../RELATORIO.md).
+Convenção: evidências antigas **não são reescritas** quando o código evolui — registram o que era
+verdade na data. Ex.: `seed-volume-cluster.md` cita `clinical_events = 1.360.406`, contagem anterior
+ao fix de `setor` + HbA1c; o valor atual (**1.387.934**) está em `pesquisador-coorte.md`.
+
 ## Índice
 
-| Arquivo | Passo | O que prova |
+| Arquivo | Fase | O que prova |
 |---|---|---|
-| `seed-volume-cluster.md` | D3 | volume-alvo semeado no cluster (contagens conferidas no psql) |
-| `authz-matriz-completa.md` | D3 · P2 | matriz de decisão + todos os DENYs |
-| `patient-data-coorte.md` | D3 · P3a | agregação de coorte e amostra de exames (com `EXPLAIN`) |
-| `data-transform-niveis.md` | D3 · P3b | enforcement por nível + os 5 recursos FHIR |
-| `pesquisador-coorte.md` | D3 · **P3c** | as **3 jornadas REST**; a coorte nasce no servidor; 400/403/404/502 |
-| `consultas-nomeadas.md` | Conformidade §2.1 | consultas nomeadas (Resumo/Historico/Exames/Medicamentos), lista de pacientes (searchset) e de projetos (JSON); testes JUnit verdes, 🚧 capturas `curl` |
-| `frontend-real.md` | Frontend | SPA React real: OIDC + 3 jornadas contra o gateway, CORS, `meta.security`, coorte rica; builds verdes, 🚧 prints |
-| `escala-hpa-grpc-lb.md` | D5 · Portão 5 | blocos solo capturados (DNS 1×3, pods-wide, HPA %/60%, smoke); 🚧 carga (§2/§4b) pendente do k6 |
-| `hpa-timeline.csv` | D5 · Portão 5 | 🚧 gerado por `make watch-hpa` — réplicas/CPU × tempo, por cenário (gráfico §4.9 #6) |
-| `rate-limit-429.md` | D4 · Portão 4 | rate limiting: 429 sob rajada `-P20` (72×200 + 128×429) |
-| `logging-json.md` | D4 · Portão 4 | log de acesso JSON (auditoria: `username`/`role`/`nivel`/`patient_id`) |
-| `dashboard-red-use.md` | D4 · fase (e) | dashboard RED/USE (6 métricas); 🚧 screenshot sob carga |
-| `loki-logql.md` | D6 · ➕ | logs agregados no Loki (LogQL sobre o JSON); 🚧 screenshot |
-| `tracing-tempo.md` | D6 · ➕ | tracing OTel+Tempo (trace `REST→gRPC→SQL` + salto trace→log); 🚧 screenshot |
-| `postgres-exporter-db.md` | D6 · ➕ | métricas do banco (`pg_stat_*`), prova do §7.1; 🚧 screenshot sob carga |
-| `*http_server_requests*.json` | D2 · M1 | scrape do Gateway no Prometheus/Grafana |
+| `seed-volume-cluster.md` | (a) | volume-alvo semeado no cluster (contagens conferidas no psql) |
+| `authz-matriz-completa.md` | (a) | matriz de decisão ALLOW/DENY + nível, com todos os negativos |
+| `patient-data-coorte.md` | (a) | agregação de coorte e amostra de exames (com `EXPLAIN` e tempos) |
+| `data-transform-niveis.md` | (a) | enforcement por nível + os 5 recursos FHIR |
+| `pesquisador-coorte.md` | (a) | as 3 jornadas REST; a coorte nasce no servidor; 400/403/404/502 |
+| `consultas-nomeadas.md` | (a) | consultas nomeadas (Resumo/Historico/Exames/Medicamentos), listas de pacientes e projetos |
+| `frontend-real.md` | (a) | SPA React real: OIDC + 3 jornadas contra o gateway, CORS, `meta.security` |
+| `escala-hpa-grpc-lb.md` | (c)(d) | DNS ClusterIP×headless (1×3 endereços), distribuição de pods, HPA `%/60%` e 1→3 réplicas sob carga, smoke |
+| `hpa-timeline.csv` | (d) | série temporal réplicas/CPU × tempo do cenário `hpa` (`make watch-hpa`) |
+| `rate-limit-429.md` | extra | rate limiting: 429 sob rajada `-P20` (72×200 + 128×429) |
+| `logging-json.md` | extra | log de acesso JSON (auditoria: `username`/`role`/`nivel`/`patient_id`) |
+| `dashboard-red-use.md` | (e) | dashboard RED/USE (7 painéis, 6+ métricas) com prints sob tráfego |
+| `loki-logql.md` | extra | logs agregados no Loki (LogQL sobre o JSON), com prints |
+| `tracing-tempo.md` | extra | tracing OTel+Tempo: trace `REST→gRPC→SQL` multi-serviço, com prints |
+| `postgres-exporter-db.md` | extra | métricas do banco (`pg_stat_*`) no dashboard, com print |
+| `*http_server_requests*.json` | M1 | scrape do Gateway comprovado no Prometheus e no Grafana |
 
-> Evidências antigas **não são reescritas** quando o código evolui: elas registram o que era verdade
-> na data. Ex.: `seed-volume-cluster.md` cita `clinical_events = 1.360.406`, contagem anterior ao fix
-> de `setor` + HbA1c; o valor atual (**1.387.934**) está em `pesquisador-coorte.md`.
+## Imagens (`imagens/`)
 
-## M1 — esqueleto ambulante no cluster kind (D2 final)
+| Arquivos | Conteúdo |
+|---|---|
+| `grafana_dash1.png`, `grafana_dash2.png` | dashboard RED/USE no Grafana: throughput por status, p95/p99, erro 5xx, pods, CPU/mem por pod, HikariCP e row DB (Postgres) |
+| `hpa.png`, `hpa2.png` | `kubectl get hpa -w` sob carga: CPU estourando o alvo (163%/60%) e réplicas 1→3 |
+| `hpa10vh*.png`, `hpa50vh*.png` | resumos k6 do cenário `hpa` a 10/50 VUs |
+| `k6_1replica_*.png` | resumos k6 do cenário `1replica` (baseline) por nível de VUs |
+| `k6_3replica_*.{png,jpeg}` | resumos k6 do cenário 3 réplicas por nível de VUs |
+| `k6_prep*.jpeg` | preparação da bateria (`run-load-tests.sh`: estado do cluster + warm-up) |
+| `logLoki.png`, `logLoki2.png` | Loki Explore: LogQL `\| json \| nivel="FULL"` e linha `http_access` expandida (com `trace_id`) |
+| `traceTempo*.png` | Tempo: busca de traces e trace multi-serviço `REST→gRPC→gRPC→SQL` |
 
-Requisição real atravessa Gateway → Authorization → Patient Data → Postgres → Data Transform,
-**rodando no cluster kind `pspd`**, e a métrica é raspada pelo kube-prometheus-stack.
-
-### Arquivos
+## M1 — esqueleto ambulante no cluster (arquivos JSON)
 
 - **`prometheus-http_server_requests-api-gateway.json`** — resultado da query
   `http_server_requests_seconds_count{application="api-gateway"}` direto no **Prometheus**
@@ -39,23 +48,6 @@ Requisição real atravessa Gateway → Authorization → Patient Data → Postg
   Grafana** (via `/api/datasources/proxy/uid/prometheus/...`). Comprova que o Grafana está ligado
   ao Prometheus e enxerga a métrica. Valores capturados: `status=200 → 17`, `status=403 → 1`
   (o 403 é o caso negativo `med.semvinculo`).
-
-### Como capturar o screenshot do Grafana (painel/Explore)
-
-O screenshot precisa ser tirado pelo seu navegador (a automação de browser deste ambiente não
-alcança o port-forward local). Passos:
-
-```bash
-make grafana          # port-forward em http://localhost:3000 e imprime user/senha (admin + senha do secret)
-```
-No Grafana → **Explore** → datasource **Prometheus** → query:
-```
-http_server_requests_seconds_count{application="api-gateway"}
-```
-Salve o PNG aqui como `grafana-http_server_requests-api-gateway.png`.
-
-> A senha do Grafana deste kube-prometheus-stack é **gerada aleatoriamente** (não é `prom-operator`);
-> `make grafana` a lê do secret `kps-grafana`.
 
 ### Como reproduzir a verificação in-cluster
 

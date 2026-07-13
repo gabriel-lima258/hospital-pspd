@@ -1,9 +1,5 @@
 # Contratos congelados — Dia 1 (PSPD/UnB)
 
-Os **3 contratos** que destravam o paralelismo entre as trilhas (§2.2 do roteiro). **Mudou um
-contrato? Avise o grupo no mesmo dia.** Esta página é o índice único; o detalhe de cada um está
-no seu arquivo-fonte.
-
 | Contrato | Fonte da verdade | Trava |
 |---|---|---|
 | Dados | [`db/schema.sql`](../db/schema.sql) | Patient Data (SQL), seed |

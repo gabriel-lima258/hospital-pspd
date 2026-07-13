@@ -1,4 +1,4 @@
-# Cluster kind — 1 control-plane + 3 workers (§4.2 do roteiro).
+# Cluster kind — 1 control-plane + 3 workers (justificativa em docs/RELATORIO.md §3).
 # Satisfaz o requisito "1 nó mestre + >=3 workers"; reprodutível com um comando.
 # Uso: kind create cluster --name pspd --config k8s/kind-config.yaml  (via `make cluster`)
 kind: Cluster

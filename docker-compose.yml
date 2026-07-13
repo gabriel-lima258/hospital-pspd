@@ -1,4 +1,4 @@
-# Ambiente local (inner loop rápido, sem K8S) — Fase A do roteiro.
+# Ambiente local (inner loop rápido, sem K8S).
 # Postgres carrega db/schema.sql no primeiro boot; Keycloak sobe em dev mode.
 services:
   db:

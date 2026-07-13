@@ -1,16 +1,16 @@
 # CLAUDE.md — Hospital Universitário (PSPD/UnB)
 
-Manual de operação deste repositório. **Toda sessão de IA lê este arquivo primeiro.** É mantido curto de propósito — o detalhe completo está em `docs/Roteiro_PSPD_Observabilidade_K8S.md` (e o passo-a-passo verificável no **Apêndice A** dele).
+Manual de operação deste repositório. **Toda sessão de IA lê este arquivo primeiro.** É mantido curto de propósito.
 
-> **Como usar a referência:** este `CLAUDE.md` fica **sempre no contexto** (por isso é curto). O **roteiro** (`docs/Roteiro_PSPD_Observabilidade_K8S.md`) **não** é carregado automaticamente — de propósito, para manter as sessões enxutas. **Abra-o sob demanda** (Read) quando precisar do detalhe de uma decisão; as referências "§X" espalhadas por este arquivo apontam para as seções dele. Consulte-o obrigatoriamente antes de: montar o cluster (§4.2), gerar o seed (§4.4), mexer em gRPC/proto (§4.6), escrever scripts k6 (§4.9), configurar HPA (§7.2) e ao redigir cada fase do relatório (§9).
+> **Como usar a referência:** este `CLAUDE.md` fica **sempre no contexto** (por isso é curto). O detalhe mora em três lugares, abertos sob demanda (Read): `docs/EnunciadoTrabalho.md` (o que é avaliado), `docs/RELATORIO.md` (relatório: metodologia, cluster, as 5 fases medidas, descobertas técnicas) e `docs/contratos.md` (contratos JWT/gRPC/dados + decisões de projeto). Runbooks passo-a-passo em `docs/RUNBOOK-*.md`.
 
 ## O que é
 
-Aplicação de microsserviços que expõe dados clínicos no padrão **HL7/FHIR** com controle de acesso por perfil (Médico / Estagiário / Pesquisador). Trabalho acadêmico de PSPD (FGA/UnB) para explorar **observabilidade e escalabilidade em Kubernetes**. Nota = **80% profundidade técnica + 20% entregas**; ponto extra por observabilidade além do pedido. **Prazo: 1 semana.**
+Aplicação de microsserviços que expõe dados clínicos no padrão **HL7/FHIR** com controle de acesso por perfil (Médico / Estagiário / Pesquisador). Trabalho acadêmico de PSPD (FGA/UnB) para explorar **observabilidade e escalabilidade em Kubernetes**. Nota = **80% profundidade técnica + 20% entregas**; ponto extra por observabilidade além do pedido.
 
 ## Regras de ouro (não viole)
 
-1. **Esqueleto ambulante primeiro.** Uma requisição real atravessa Gateway → gRPC → 3 serviços → Postgres → FHIR → métrica no Grafana **antes** de completar qualquer serviço. Meta: fim do D2. Use mocks onde faltar lógica.
+1. **Esqueleto ambulante primeiro.** Uma requisição real atravessa Gateway → gRPC → 3 serviços → Postgres → FHIR → métrica no Grafana **antes** de completar qualquer serviço. Use mocks onde faltar lógica.
 2. **Contratos congelados antes de código:** `db/schema.sql`, `proto/hospital.proto`, claims do JWT. Mudou um contrato? Avise o grupo no mesmo dia.
 3. **Números medidos > features bonitas.** Proteja as 5 fases medidas acima de tudo. Um FHIR parcial com 5 testes de carga rodados vale mais que um FHIR perfeito sem carga.
 4. **Tudo que repete vira script:** `Makefile`, `db/seed.py`, `loadtest/run-load-tests.sh`, `loadtest/plot.py`.
@@ -20,7 +20,7 @@ Aplicação de microsserviços que expõe dados clínicos no padrão **HL7/FHIR*
 - Frontend (React/Next) → **REST/HTTPS** → API Gateway.
 - Gateway → **gRPC/HTTP2** → Authorization, Patient Data, Data Transform.
 - Autenticação: **Keycloak** (OAuth2/OIDC). JWT carrega `preferred_username` + `realm_access.roles` ∈ {MEDICO, ESTAGIARIO, PESQUISADOR}.
-- **PostgreSQL** — 1 réplica, *stateful* (gargalo esperado; ver §7.1 do roteiro).
+- **PostgreSQL** — 1 réplica, *stateful* (gargalo esperado; ver descoberta 9.1 do `docs/RELATORIO.md`).
 
 | Serviço | Papel |
 |---|---|
@@ -43,7 +43,7 @@ frontend/         # React/Next
 k8s/              # base/ (Deployments, Services, headless) · hpa/ · observability/ · jobs/
 loadtest/         # k6/, run-load-tests.sh, plot.py
 keycloak/         # realm-export.json
-docs/             # roteiro, prompts.md, evidencias/
+docs/             # EnunciadoTrabalho.md · RELATORIO.md · contratos.md · RUNBOOK-*.md · evidencias/
 ```
 
 ## Comandos
@@ -51,12 +51,12 @@ docs/             # roteiro, prompts.md, evidencias/
 - `make up` / `make rebuild` — sobe tudo local (docker-compose); `rebuild` recompila as imagens.
 - `make cluster` — cria kind 1+3 + metrics-server + kube-prometheus-stack.
 - `make seed` — popula o banco no volume-alvo (`seed=42`, reprodutível).
-- `make deploy` — build das imagens + `kind load` + aplica `k8s/base` e `k8s/observability` (**não** o HPA). Inclui o **postgres-exporter** (métricas `pg_stat_*` do banco → dashboard, §7.1).
+- `make deploy` — build das imagens + `kind load` + aplica `k8s/base` e `k8s/observability` (**não** o HPA). Inclui o **postgres-exporter** (métricas `pg_stat_*` do banco → dashboard).
 - `make scale N=3` · `make pods-wide` — fixa réplicas · distribuição dos pods entre workers.
 - `make watch-hpa SCENARIO=hpa` — série temporal de réplicas/CPU → CSV (rodar em background na rampa).
-- `make grpc-lb-on|off` — headless+`round_robin` (default) × ClusterIP+`pick_first` (o "antes" do §7.3).
+- `make grpc-lb-on|off` — headless+`round_robin` (default) × ClusterIP+`pick_first` (o "antes" da descoberta de balanceamento gRPC, RELATORIO 9.3).
 - `make hpa-on|off` — aplica/remove `k8s/hpa/` (min 1 / max 10 / CPU 60%). `hpa-off` não reseta réplicas.
-- `make load SCENARIO=1replica|3replicas-off|3replicas-on|hpa` — bateria k6 (10/50/100/500/1000 VUs): prepara o estado do cluster, port-forward efêmero, warm-up+3min+cool-down por nível, summary→`loadtest/out/`. **Falta rodar/medir (Trilha D).**
+- `make load SCENARIO=1replica|3replicas-off|3replicas-on|hpa` — bateria k6 (10/50/100/500/1000 VUs): prepara o estado do cluster, port-forward efêmero, warm-up+3min+cool-down por nível, summary→`loadtest/out/`.
 - `make plot` — summaries do k6 → `docs/evidencias/resultados.csv` + PNGs (throughput/p95/1v3). Não depende do Prometheus.
 - `make loki` — **(bônus)** Loki + Promtail na namespace `monitoring`; datasource auto-registrado no Grafana do kps. Agrega os logs JSON do Gateway; consulta LogQL `{namespace="default"} | json | nivel="FULL"`.
 - `make dashboard` — importa o dashboard **RED/USE** (`k8s/observability/dashboards/red-use.json`) no Grafana do kps via ConfigMap (sidecar). RED do Gateway + USE por pod + pods/HPA + saturação HikariCP.
@@ -69,7 +69,7 @@ docs/             # roteiro, prompts.md, evidencias/
 - **Hexagonal proporcional ao domínio** (não igual nos 4 — camada só existe se isola algo real):
   - `authorization` e `data-transform` têm regra de negócio de verdade → `domain/` livre de framework (testável sem Spring/DB) + `application/` (casos de uso) + `adapters/in|out`.
   - `api-gateway` (orquestrador REST→gRPC) e `patient-data` (consulta SQL fina) → **adapters finos**; não crie `port` com uma única implementação nem mappers desnecessários.
-  - Regra prática: esqueleto ambulante primeiro; **nunca** deixar "onde mora o código" atrasar o M1. Números medidos > pureza de camadas.
+  - Regra prática: esqueleto ambulante primeiro; **nunca** deixar "onde mora o código" atrasar a integração ponta-a-ponta. Números medidos > pureza de camadas.
 - **Monorepo Gradle multi-project**; módulo `:proto` compartilhado (`implementation project(':proto')`).
 - Commits pequenos e frequentes na `main`.
 - **Evidências no ato:** todo print/CSV/gráfico vai para `docs/evidencias/` no mesmo dia — não deixe para o fim.
@@ -86,10 +86,6 @@ docs/             # roteiro, prompts.md, evidencias/
 - ❌ Chamada gRPC **sem deadline** → downstream travado prende a thread; sob carga = exaustão do pool. Há deadline global de 2s (`DeadlineClientInterceptor`, `gateway.grpc.deadline-ms`) → estouro vira 504.
 - ❌ `responseObserver.onError(e)` com a exceção **crua** → vaza stack/mensagem interna e vira UNKNOWN. Padrão: `log.error(..., e)` + `Status.INTERNAL.withDescription("erro interno")` (502 genérico). Erros de contrato usam código específico (NOT_FOUND/INVALID_ARGUMENT).
 
-## Fases e portões (Definition of Done)
-
-D1 fundação → **D2 esqueleto (M1, crítico)** → D3 validação funcional (M2) → D4 observabilidade + carga (M3) → D5 escala + HPA (M4) → D6 ponto extra + análise (M5) → D7 entrega (M6). **Não avance com portão vermelho.** Verificação passo-a-passo: **Apêndice A** do roteiro (`/verify-gate <n>`).
-
 ## Referência
 
-Detalhe completo: `docs/Roteiro_PSPD_Observabilidade_K8S.md`. Livro-base: Arundel & Domingus, *Cloud Native DevOps with Kubernetes*, cap. 15–16 (RED/USE, percentis, alertas por SLO, tracing).
+Relatório e análise: `docs/RELATORIO.md`. Livro-base: Arundel & Domingus, *Cloud Native DevOps with Kubernetes*, cap. 15–16 (RED/USE, percentis, alertas por SLO, tracing).

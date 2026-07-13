@@ -31,14 +31,20 @@ make grafana                     # Dashboards → "Hospital PSPD — RED / USE"
 
 ## Evidência
 
-_(pendente — capturar com o dashboard sob carga do k6: exportar PNG do painel completo e, idealmente,
-um recorte do momento em que o HPA escala [pods-ready sobe] e o p95 piora antes de melhorar. Anexar
-aqui.)_
+Dashboard **"Hospital PSPD — RED / USE"** capturado no Grafana do kube-prometheus-stack
+(2026-07-12, com tráfego passando):
+
+![Dashboard RED/USE — throughput por status (200/504), latência p95/p99, erro 5xx, pods prontos e USE CPU/memória por pod](imagens/grafana_dash1.png)
+
+![Dashboard RED/USE — saturação do pool HikariCP e row DB (Postgres): transações/s, conexões ativas e cache hit ratio](imagens/grafana_dash2.png)
+
+Os resumos do k6 por cenário/nível (throughput, latência média/p95, erro) estão em
+`imagens/k6_*.{png,jpeg}` e `imagens/hpa*.png`; os summaries brutos em `loadtest/out/`.
 
 ## Leitura para o relatório
 
 Cumpre o requisito da fase (e): observabilidade com método (RED + USE, P95/P99). O valor aparece sob
 carga — cruzar, no mesmo eixo temporal: throughput (R) subindo até o platô, p95 (D) no "joelho", CPU
 (U) batendo o alvo de 60% do HPA, pods-ready subindo em resposta, e a fila do HikariCP crescendo
-quando o Postgres satura. Com o **Loki** (logs) e, futuramente, o **Tempo** (traces) no mesmo Grafana,
-a mesma janela temporal correlaciona métrica ↔ log ↔ trace.
+quando o Postgres satura. Com o **Loki** (logs, `loki-logql.md`) e o **Tempo** (traces,
+`tracing-tempo.md`) no mesmo Grafana, a mesma janela temporal correlaciona métrica ↔ log ↔ trace.

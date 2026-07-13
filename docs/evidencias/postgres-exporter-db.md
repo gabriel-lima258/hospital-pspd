@@ -40,10 +40,10 @@ pg_stat_database_numbackends{datname="hospital"}
 
 ## Evidência
 
-_(pendente — capturar com `make load SCENARIO=1replica` rodando: screenshot da row "DB (Postgres)"
-com **tps subindo e achatando**, **conexões batendo no teto** e **cache hit caindo**, no mesmo eixo
-temporal em que a **fila do HikariCP** (painel de saturação, lado app) sobe. Esse cruzamento é a prova
-do §7.1. Anexar PNG.)_
+Row **"DB (Postgres)"** do dashboard capturada no Grafana (2026-07-12), junto do painel de
+saturação HikariCP (lado app) no mesmo eixo temporal — transações/s, conexões ativas e cache hit:
+
+![Row DB (Postgres) — tps, conexões ativas (numbackends) e cache hit ratio + saturação HikariCP](imagens/grafana_dash2.png)
 
 ## Leitura para o relatório
 

@@ -2,7 +2,7 @@
 # watch-hpa.sh — amostra o estado de escala dos 4 serviços e escreve um CSV com série temporal.
 #
 # Produz o dado do gráfico-assinatura da fase (d) do enunciado (§3.d: "criação automática de pods")
-# e do gráfico 6 do roteiro (§4.9): nº de pods × tempo, sobreposto à carga.
+# e do gráfico "nº de pods × tempo, sobreposto à carga" (docs/RELATORIO.md §7).
 #
 # Rode em background ANTES de o Carlos disparar a rampa do k6, e mate no fim:
 #

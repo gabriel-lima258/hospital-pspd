@@ -1,4 +1,4 @@
-# Evidência — D3/P3c: jornada do PESQUISADOR pela rota REST (fecha o M2)
+# Evidência — jornada do PESQUISADOR pela rota REST
 
 > Colhido em **2026-07-09**, no cluster kind `pspd`, após `make redeploy` + `make seed`.
 > Rota nova: `GET /fhir/cohort/{projetoId}?tipo=ResumoCoorte|Estatisticas|ExamesCoorte`.

@@ -1,4 +1,4 @@
-// scenario.js — bateria de carga k6 parametrizada por VUS (§4.9 do roteiro).
+// scenario.js — bateria de carga k6 parametrizada por VUS (protocolo em docs/RELATORIO.md §5).
 //
 // Um único script, rodado 5× (VUS=10/50/100/500/1000) com DURAÇÃO IDÊNTICA, para que as rodadas
 // sejam comparáveis. O mix de perfis (médico/estagiário/pesquisador) vem do pool `tokens.json`

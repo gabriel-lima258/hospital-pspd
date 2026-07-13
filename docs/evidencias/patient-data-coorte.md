@@ -1,6 +1,6 @@
-# Patient Data — consultas clínicas e agregações de coorte (P3a, D3)
+# Patient Data — consultas clínicas e agregações de coorte
 
-Evidência do sub-item "Pesquisador vê AGG/ANON de verdade" do **Portão 3 (M2)**: o
+Evidência de que o pesquisador vê AGGREGATED/ANONYMIZED de verdade: o
 `PatientData.Fetch` deixou de devolver 4 campos demográficos e passou a ramificar por
 `tipo_consulta` em três consultas — individual, resumo de coorte e exames de coorte.
 

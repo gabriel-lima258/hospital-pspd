@@ -1,11 +1,11 @@
-# Evidência — D3 Passo 1: seed de volume no cluster (`make seed`, §4.4)
+# Evidência — seed de volume no cluster (`make seed`)
 
 Volume de produção-de-teste semeado no Postgres do cluster kind (`db:5432`) via Job k8s,
 `seed=42` (reprodutível), `COPY` em massa (não INSERT). Comando: `make seed SCALE=50000`.
 
 ## Contagens (kubectl exec deploy/db -- psql ...)
 
-| Tabela | Linhas | Alvo §4.4 |
+| Tabela | Linhas | Alvo |
 |---|---:|---|
 | `patients` | **50.000** | 50.000 |
 | `encounters` | **199.615** | ~200.000 |

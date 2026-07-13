@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # =============================================================================
-# db/seed.py — Seed de dados sintéticos EM VOLUME (Trilha D, §4.4 do roteiro).
+# db/seed.py — Seed de dados sintéticos EM VOLUME (reprodutível, seed=42).
 #
 # Por que existe: teste de carga sobre banco vazio é INVÁLIDO — o Postgres serve
 # tudo de cache e o gargalo real (I/O, planejamento de query, contenção) nunca

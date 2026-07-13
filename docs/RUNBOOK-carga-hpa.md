@@ -3,8 +3,7 @@
 Passo a passo ordenado, com **📸 quando tirar print e de quê**. Tudo no **WSL**. É o núcleo dos 80% da
 nota (fases b/c/d + descobertas §7.1/§7.3). **Dura ~1,5–2h** (4 baterias × 5 níveis × ~4,5 min).
 
-> Fecha os blocos **1 e 2** de [`CHECKLIST-PENDENTE.md`](CHECKLIST-PENDENTE.md). Todo print vai para
-> `docs/evidencias/` **no mesmo dia**.
+> Todo print vai para `docs/evidencias/` **no mesmo dia**.
 
 ---
 

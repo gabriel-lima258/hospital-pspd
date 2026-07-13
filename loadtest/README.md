@@ -1,7 +1,7 @@
 # loadtest — bateria k6 (Trilha D)
 
 Ferramenta de carga das fases (b) carga, (c) escalabilidade e (d) HPA. Mede a **aplicação**, não o
-Keycloak (JWTs pré-gerados, §4.9 do roteiro).
+Keycloak (JWTs pré-gerados). Resultados e análise: `docs/RELATORIO.md` §5–§7.
 
 ## Pré-requisitos (na WSL)
 
@@ -22,8 +22,8 @@ Cluster de pé (`make cluster && make deploy && make seed`) e Keycloak com **acc
 
 ```bash
 make load SCENARIO=1replica        # fase (b)/(c): baseline 1 réplica
-make load SCENARIO=3replicas-off   # §7.3 ANTES  (ClusterIP + pick_first — 1 pod satura)
-make load SCENARIO=3replicas-on    # §7.3 DEPOIS (headless + round_robin — balanceia)
+make load SCENARIO=3replicas-off   # balanceamento gRPC: ANTES  (ClusterIP + pick_first — 1 pod satura)
+make load SCENARIO=3replicas-on    # balanceamento gRPC: DEPOIS (headless + round_robin — balanceia)
 make load SCENARIO=hpa             # fase (d): autoscaling sob carga
 make plot                          # CSV mestre + PNGs em docs/evidencias/
 ```

@@ -1,13 +1,14 @@
 # Evidência — Frontend REAL integrado ao backend (K8S)
 
-> **Status:** código pronto; `./gradlew build` e `npm run build` **verdes**. Prints a colher rodando o
-> `docs/RUNBOOK-frontend.md` (make deploy + seed + 3 port-forwards + alias `keycloak` no hosts).
+> SPA React/Vite integrada de verdade ao cluster: login OIDC no Keycloak real + 3 jornadas contra o
+> gateway. `./gradlew build` e `npm run build` **verdes**. Roteiro de execução passo-a-passo:
+> `docs/RUNBOOK-frontend.md`.
 
-## O que provar (checklist de prints)
+## O que a integração prova
 
-| # | Print | O que evidencia |
+| # | Cenário | O que evidencia |
 |---|---|---|
-| 1 | Tela de login do **Keycloak real** (URL `http://keycloak:8080/realms/hospital/...`) | OIDC de verdade, não mock |
+| 1 | Login no **Keycloak real** (URL `http://localhost:8080/realms/hospital/...`) | OIDC de verdade, não mock |
 | 2 | `med.cardoso` — Patient **FULL** (nome, CPF/CNS) + selo "FULL" | acesso FULL + `meta.security` |
 | 3 | `est.almeida` — mesmo paciente **PARTIAL** (`J. da S.`, sem CPF) + selo "PARTIAL" | enforcement de nível ponta-a-ponta |
 | 4 | `med.cardoso` — troca `?tipo=` (Resumo/Exames/Medicamentos) muda a fatia | consultas nomeadas |
@@ -18,7 +19,7 @@
 | 9 | **DevTools → Network:** chamadas a `localhost:9000/fhir/...` e `/projects` com `Authorization: Bearer`, respostas FHIR | integração real (não demo) |
 | 10 | Acesso negado (`med.semvinculo` → 403) na UI | DENY visível |
 
-## Prova já verificada (offline)
+## Prova verificada (offline)
 - `./gradlew build` **exit 0** (inclui teste de `Patient.meta.security` FULL/PARTIAL/ANONYMIZED).
 - `cd frontend && npm run build` **exit 0** (tsc + vite; adapter `lib/cohort.ts` tipado, sem `any`).
 

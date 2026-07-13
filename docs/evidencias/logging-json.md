@@ -1,4 +1,4 @@
-# Logging estruturado JSON — linha de acesso (Portão 4, auditoria)
+# Logging estruturado JSON — linha de acesso (auditoria)
 
 > Capturado 2026-07-10 (docker-compose). Gateway com `AccessLogFilter` + `logback-spring.xml`
 > (`logstash-logback-encoder`). Cada requisição de negócio emite uma linha `http_access` em JSON no
@@ -33,6 +33,6 @@ inexistente.
 > `preferred_username` (`med.cardoso`) — auditoria precisa do login legível. O JSON acima já reflete a
 > correção; recapturar após `make rebuild` se necessário.
 
-> **Próximo (bônus):** Promtail/Alloy → **Loki** agrega essas linhas de todos os pods; no Grafana dá
-> para filtrar por `{nivel="PARTIAL"}` ou `{username="med.cardoso"}` e correlacionar com as métricas
-> (Prometheus) e traces (Tempo) no mesmo painel.
+> **Agregação (bônus, feita):** Promtail → **Loki** coleta essas linhas de todos os pods; no Grafana
+> dá para filtrar por `| json | nivel="FULL"` e correlacionar com métricas (Prometheus) e traces
+> (Tempo). Evidências com screenshots: `loki-logql.md` e `tracing-tempo.md`.

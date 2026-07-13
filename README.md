@@ -4,9 +4,10 @@ Aplicação de **microsserviços** que expõe dados clínicos no padrão **HL7/F
 acesso por perfil (Médico / Estagiário / Pesquisador). Trabalho acadêmico de **PSPD (FGA/UnB)** para
 explorar **observabilidade e escalabilidade em Kubernetes**.
 
-> **Novo no projeto?** Leia primeiro o `[CLAUDE.md](CLAUDE.md)` (manual de operação, curto) e os
-> **3 contratos congelados** em `[docs/contratos.md](docs/contratos.md)`. O detalhe completo está em
-> `[docs/Roteiro_PSPD_Observabilidade_K8S.md](docs/Roteiro_PSPD_Observabilidade_K8S.md)`.
+> **Novo no projeto?** Leia primeiro os **3 contratos congelados** em
+> [`docs/contratos.md`](docs/contratos.md). O enunciado do trabalho está em
+> [`docs/EnunciadoTrabalho.md`](docs/EnunciadoTrabalho.md) e o relatório em
+> [`docs/RELATORIO.md`](docs/RELATORIO.md).
 
 ---
 
@@ -86,7 +87,7 @@ frontend/         # React/Next (futuro)
 k8s/              # base/ (Deployments, Services, headless) · hpa/ · observability/ · jobs/
 loadtest/         # k6/scenario.js, gen-tokens.sh, run-load-tests.sh, collect-metrics.sh, plot.py
 keycloak/         # realm-export.json + get-token.sh
-docs/             # roteiro, contratos, CHECKLIST, evidências
+docs/             # enunciado, relatório, contratos, runbooks, evidências
 ```
 
 Layout **hexagonal** por serviço: `domain/` (regras, sem framework) · `application/` (casos de uso) ·
@@ -238,7 +239,7 @@ Detalhes dos claims em `[docs/contratos.md](docs/contratos.md)`. Para recriar o 
 | `make grpc-lb-off`                          | gRPC pinado em 1 pod: ClusterIP + `pick_first` — o "antes" do §7.3                              | ✅        |
 | `make hpa-on` / `make hpa-off`              | Aplica/remove o HPA (`k8s/hpa/`, min 1 / max 10 / CPU 60%)                                      | ✅        |
 | `make demo`                                 | Deploy + seed enxuto + smoke das 3 jornadas. `DEMO_FRESH=1` recria o cluster do zero            | ✅        |
-| `make load SCENARIO=1replica|3replicas-off|3replicas-on|hpa` | Bateria k6 (10/50/100/500/1000 VUs) — ver `loadtest/README.md`                  | ✅ (falta medir) |
+| `make load SCENARIO=1replica|3replicas-off|3replicas-on|hpa` | Bateria k6 (10/50/100/500/1000 VUs) — ver `loadtest/README.md`                  | ✅        |
 | `make plot`                                 | Summaries do k6 → `docs/evidencias/resultados.csv` + PNGs                                       | ✅        |
 | `make help`                                 | Lista os alvos                                                                                  | ✅        |
 
@@ -292,27 +293,17 @@ Gradle:
 
 
 
-## Estado atual
+## Documentação (`docs/`)
 
-- ✅ **M1a/M1** — fundação, cluster kind 1+3, esqueleto ambulante ponta-a-ponta com métrica no Grafana.
-- ✅ **M2** — validação funcional: seed de volume (50k pacientes, ~1,39M eventos), decisão de acesso
-  testada e as **3 jornadas REST** (médico/FULL, estagiário/PARTIAL, pesquisador/AGGREGATED+ANONYMIZED).
-- ✅ **Infra de escala** — Service headless + `round_robin`, HPA (min 1 / max 10 / CPU 60%), toggles
-  no `Makefile`. Falta **medir**.
-- ✅ **Gateway maduro** — rate limiting por usuário (429), logging estruturado JSON (auditoria),
-  erro gRPC→HTTP global (404/400/…). Harness k6 (`make load`/`make plot`) pronto.
-- ✅ **Resiliência** — deadline gRPC default 2s (protege o thread pool sob carga → 504); erros
-  internos não vazam (`INTERNAL` genérico + `log.error` com `trace_id`); logs JSON nos 4 serviços.
-- ✅ **Logs agregados (bônus)** — Loki + Promtail (`make loki`); LogQL no Grafana sobre o JSON.
-- ✅ **Tracing distribuído (bônus)** — OTel agent + Tempo (`make tracing`); trace `REST→gRPC→SQL`
-  com salto trace→log por `trace_id`. Fecha o triângulo métricas+logs+traces no mesmo Grafana.
-- ✅ **Métricas do banco (bônus)** — `postgres-exporter` (`k8s/observability/`, via `make deploy`):
-  `pg_stat_*` no dashboard (tps, conexões, cache hit) → prova o gargalo do Postgres (§7.1).
-- 🚧 **M3/M4** — dashboards RED/USE, baterias k6 (10/50/100/500/1000 VUs), escalabilidade e HPA.
-  Falta **medir** (rodar o k6) e o dashboard: é onde estão os **80% da nota**.
-
-Placar completo, donos por trilha e portões: **`[docs/CHECKLIST.md](docs/CHECKLIST.md)`**. Detalhe
-técnico: [roteiro](docs/Roteiro_PSPD_Observabilidade_K8S.md).
+| Documento | Conteúdo |
+|---|---|
+| [`docs/EnunciadoTrabalho.md`](docs/EnunciadoTrabalho.md) | Especificação do professor (o que é avaliado) |
+| [`docs/RELATORIO.md`](docs/RELATORIO.md) | **Relatório do trabalho** — metodologia, cluster, as 5 fases medidas, descobertas, extras |
+| [`docs/contratos.md`](docs/contratos.md) | Os 3 contratos congelados: JWT/roles, gRPC (`proto/`), dados (`db/schema.sql`) + decisões de projeto |
+| [`docs/RUNBOOK-carga-hpa.md`](docs/RUNBOOK-carga-hpa.md) | Passo-a-passo das baterias k6 + capturas de escala/HPA |
+| [`docs/RUNBOOK-frontend.md`](docs/RUNBOOK-frontend.md) | Passo-a-passo do frontend real (OIDC + gateway no cluster) |
+| [`docs/RUNBOOK-consultas-nomeadas.md`](docs/RUNBOOK-consultas-nomeadas.md) | Validação das consultas nomeadas do enunciado via `curl` |
+| [`docs/evidencias/`](docs/evidencias/README.md) | Evidências brutas: saídas de comando, prints, CSVs (índice no README da pasta) |
 
 ---
 
@@ -349,16 +340,17 @@ O frontend do Hospital PSPD foi totalmente implementado contendo todas as regras
   npm run build
   ```
 
-### Variáveis de Ambiente (`.env` na raiz da pasta `frontend`)
-Crie um arquivo `.env` para apontar para o Keycloak real e o API Gateway:
+### Variáveis de Ambiente (`frontend/.env` — já versionado com o modo real)
 ```env
-VITE_API_GATEWAY_URL=http://localhost:8080
-VITE_KEYCLOAK_URL=http://localhost:8085
-VITE_KEYCLOAK_REALM=hospital-realm
+VITE_API_GATEWAY_URL=http://localhost:9000
+VITE_KEYCLOAK_URL=http://localhost:8080
+VITE_KEYCLOAK_REALM=hospital
 VITE_KEYCLOAK_CLIENT_ID=hospital-frontend
-VITE_DEMO_MODE=true
+VITE_DEMO_MODE=false
 ```
-> **Nota:** Defina `VITE_DEMO_MODE=true` para rodar o frontend no modo demonstração (utilizando mockData rico localmente, ideal para testes sem backend local). Caso queira usar o fluxo real do Keycloak, defina `VITE_DEMO_MODE=false`.
+> **Nota:** para o modo demonstração (mockData local, sem backend), copie `frontend/.env.demo` para
+> `frontend/.env.local`. O fluxo **real** (Keycloak + gateway no cluster, com port-forwards) está
+> passo-a-passo em [`docs/RUNBOOK-frontend.md`](docs/RUNBOOK-frontend.md).
 
 ### Fluxo de Autenticação
 O sistema implementa o fluxo de autenticação **OAuth2 / OIDC** via Keycloak:

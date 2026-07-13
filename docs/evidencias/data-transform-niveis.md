@@ -1,4 +1,4 @@
-# Data Transform — enforcement por nível + FHIR completo (P3b, D3)
+# Data Transform — enforcement por nível + FHIR completo
 
 Evidência do fechamento da **dívida de enforcement** registrada no M1/P2: o `data-transform`
 deixou de ignorar `nivel` (passthrough para um `Patient` mínimo) e passou a **aplicar o nível** e a
@@ -189,6 +189,6 @@ curl -s -H "Authorization: Bearer $TOKEN" localhost:9001/fhir/Patient/P000001 \
   | jq -r '.entry[].resource.resourceType' | grep -q '^Patient$' && echo OK
 ```
 
-Atualizados: `README.md`, `docs/evidencias/README.md`, `docs/CHECKLIST.md` e o portão **2.3** do
-Apêndice A do roteiro. As evidências históricas (`seed-volume-cluster.md`, `patient-data-coorte.md`)
+Atualizados na época: `README.md` e `docs/evidencias/README.md`. As evidências históricas
+(`seed-volume-cluster.md`, `patient-data-coorte.md`)
 não foram reescritas — registram o que era verdade na data em que foram colhidas.

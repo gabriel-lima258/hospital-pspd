@@ -4,9 +4,10 @@
 > nomeadas de médico/estagiário (`ResumoClinico`/`HistoricoClinico`/`Exames`/`Medicamentos`/`ListaPacientes`)
 > e a lista de projetos do pesquisador (item iv, `ListaProjetos`).
 >
-> **Status.** Código + **testes JUnit verdes** (`./gradlew build` exit 0). As capturas `curl` abaixo são
-> o **runbook**: rodar após `make redeploy` + `make seed` (o proto mudou — rebuild obrigatório) e colar a
-> saída real. Formato espelha `pesquisador-coorte.md`.
+> **Prova.** Código + **testes JUnit verdes** (`./gradlew build` exit 0), cobrindo fatias, listas e a
+> matriz de autorização (seção 5). Validação E2E via `curl`: roteiro passo-a-passo com saídas esperadas
+> em [`docs/RUNBOOK-consultas-nomeadas.md`](../RUNBOOK-consultas-nomeadas.md) (exige `make redeploy` +
+> `make seed` — o proto mudou, rebuild obrigatório).
 
 ## Contrato (o que mudou)
 

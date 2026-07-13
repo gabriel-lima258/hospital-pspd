@@ -35,14 +35,21 @@ make grafana                     # abre o Grafana; Explore → datasource "Loki"
 
 ## Evidência
 
-_(pendente — screenshot do Grafana Explore com uma das consultas acima retornando linhas
-`http_access`, anexar como PNG aqui.)_
+Grafana → Explore → Loki (2026-07-12), consulta `{namespace="default"} | json | nivel="FULL"`
+retornando as linhas `http_access` do Gateway com os campos JSON expostos como filtros:
+
+![Loki Explore — LogQL com | json | nivel="FULL" retornando http_access](imagens/logLoki.png)
+
+Linha expandida — todos os campos de auditoria, incluindo `trace_id`/`span_id` (injetados pelo OTel
+agent), que permitem o salto log↔trace:
+
+![Linha http_access expandida com username, role, nivel, patient_id, status e trace_id](imagens/logLoki2.png)
 
 ## Leitura para o relatório
 
 Fecha o triângulo de observabilidade no mesmo Grafana: **métricas** (Prometheus, RED/USE),
-**logs** (Loki, auditoria por `username`/`nivel`) e — quando o tracing entrar — **traces** (Tempo).
+**logs** (Loki, auditoria por `username`/`nivel`) e **traces** (Tempo, ver `tracing-tempo.md`).
 O valor está na correlação: um pico de `duration_ms` no log cruza com a latência p95 do Prometheus e
-(futuramente) com o trace da requisição lenta. Decisão consciente: **não** promover campos de alta
+com o trace da requisição lenta (mesmo `trace_id`). Decisão consciente: **não** promover campos de alta
 cardinalidade (`patient_id`, `username`) a *labels* do Loki — eles ficam no corpo JSON e são
 filtrados por `| json`, evitando explosão de séries (má prática que o Loki penaliza).

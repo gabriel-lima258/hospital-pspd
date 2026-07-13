@@ -1,4 +1,4 @@
-# Evidência — D3 Passo 2: matriz de autorização completa (P-authz)
+# Evidência — matriz de autorização completa
 
 Decisão ALLOW/DENY + nível para os 3 perfis, decidida no domínio puro `AuthorizationPolicy`
 (sem Spring/DB) e orquestrada pelo adapter gRPC. Dados do seed do P1.

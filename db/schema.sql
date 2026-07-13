@@ -5,7 +5,7 @@
 --
 -- Os índices ao final NÃO são cosméticos: sem eles as agregações do pesquisador
 -- (clinical_events por id_paciente / codigo_tipo) ficam lentas e o teste de carga
--- mede "índice faltando", não a arquitetura. Ver §4.3 e §7.1 do roteiro.
+-- mede "índice faltando", não a arquitetura. Ver descoberta 9.1 do docs/RELATORIO.md.
 -- =============================================================================
 
 -- Pacientes (raiz do prontuário). id no padrão P000001.

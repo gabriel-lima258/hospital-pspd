@@ -1,12 +1,8 @@
-# Escalabilidade, HPA e balanceamento gRPC (Trilha A — Portão 5)
+# Escalabilidade, HPA e balanceamento gRPC (fases c e d)
 
-> ⚠️ **Estado (2026-07-10): blocos solo capturados; blocos com carga pendentes do Carlos (k6).**
-> Rodado no cluster kind `pspd` (1 control-plane + 3 workers). Capturados nesta data: §1 (DNS),
-> §3 (distribuição de pods), §4 `kubectl get hpa`, §6 (smoke). Continuam `(pendente)` os que exigem
-> a bateria k6: §2 (antes×depois sob carga), §4b (CSV da série temporal) e §5 (§7.2 sob rampa).
-> Regra de ouro: evidência no mesmo dia — **não** copiar números de outra rodada.
->
-> **Dono:** Arthur (Trilha A). **Consumidor:** Carlos (§7.3) e o relatório §9.5 fases (c) e (d).
+> Rodado no cluster kind `pspd` (1 control-plane + 3 workers). Capturas de **2026-07-10** (§1 DNS,
+> §3 distribuição de pods, §4 `kubectl get hpa`, §6 smoke) e **2026-07-13** (HPA sob carga k6:
+> `get hpa -w` + `hpa-timeline.csv`). Análise consolidada: `docs/RELATORIO.md` §6–§7 e §9.
 
 ---
 
@@ -68,7 +64,7 @@ Address: 10.244.1.6
 > round-robin **sobre a lista de endereços que o resolver DNS devolveu**. Com ClusterIP essa lista
 > tem um elemento. Somado a isso, o gRPC abre **uma** conexão HTTP/2 de longa duração e multiplexa
 > todos os streams nela, enquanto o `kube-proxy` só balanceia no estabelecimento da conexão. Logo:
-> 3 réplicas, 1 pod trabalhando. O diagnóstico corrente no roteiro (“falta setar `round_robin`”)
+> 3 réplicas, 1 pod trabalhando. O diagnóstico inicial do grupo (“falta setar `round_robin`”)
 > estava incorreto; o fix é o `clusterIP: None`.
 
 ---
@@ -80,7 +76,7 @@ Uma variável muda por vez. Mesmo `SCALE` do seed, mesmo nº de VUs, mesmo tempo
 ```bash
 # ── ANTES: ClusterIP + pick_first
 make grpc-lb-off && make hpa-off && make scale N=3
-#   ... Carlos roda a bateria k6 ...
+#   ... bateria k6 ...
 kubectl top pods -l app=patient-data
 
 # ── DEPOIS: headless + round_robin
@@ -89,27 +85,12 @@ make grpc-lb-on && make hpa-off && make scale N=3
 kubectl top pods -l app=patient-data
 ```
 
-**RESULTADO — `kubectl top pods` (antes)**: espera-se 1 pod saturado, 2 ~ociosos.
-
-```
-(pendente)
-```
-
-**RESULTADO — `kubectl top pods` (depois)**: espera-se CPU comparável nos 3.
-
-```
-(pendente)
-```
-
-**RESULTADO — throughput e p95 (do CSV do Carlos)**:
-
-| Cenário | VUs | Throughput (req/s) | p95 (ms) | Erro (%) |
-|---|---|---|---|---|
-| 3replicas, `grpc-lb-off` | 500 | (pendente) | (pendente) | (pendente) |
-| 3replicas, `grpc-lb-on`  | 500 | (pendente) | (pendente) | (pendente) |
+_O cenário `3replicas-off` não foi executado nesta rodada de medição; a prova da causa-raiz é o
+`nslookup` do §1 (1 endereço × 3 endereços). Os resultados medidos do cenário `3replicas-on`
+(10/50/100 VUs) estão em `loadtest/out/` e na tabela do `docs/RELATORIO.md` §5._
 
 > Se o ganho de `off`→`on` for pequeno, **não é falha do fix**: é o Postgres saturando (§7.1). Nesse
-> caso a evidência do balanceamento é o `kubectl top pods`, não o throughput. Registrar os dois.
+> caso a evidência do balanceamento é o `kubectl top pods`, não o throughput.
 
 ---
 
@@ -156,8 +137,7 @@ pspd-worker3         97m          0%       1774Mi          23%
 ```
 
 > Distribuição ideal: os 4 serviços têm exatamente 1 réplica em cada um dos 3 workers. Uso de nós
-> baixo (idle, sem carga) — a assinatura sob carga entra em §4b/§5 com a bateria do Carlos.
-> 📸 Screenshot desta saída: `docs/evidencias/pods-wide-2026-07-10.png` _(a capturar/anexar)_.
+> baixo (idle, sem carga) — a assinatura sob carga está no §4b (`hpa-timeline.csv`).
 
 ---
 
@@ -194,21 +174,23 @@ patient-data     Deployment/patient-data     cpu: 1%/60%   1         10        3
 
 > O `<unknown>` inicial é o `metrics-server` ainda populando (~60 s), não erro de config. CPU baixa
 > (idle, sem carga). `REPLICAS 3` herdado do `scale N=3` anterior — o HPA não faz scale-down imediato.
-> 📸 Screenshot desta saída: `docs/evidencias/hpa-targets-2026-07-10.png` _(a capturar/anexar)_.
 
 > `<unknown>/60%` significa `metrics-server` ainda populando (aguardar ~60 s) ou `resources.requests.cpu`
 > ausente. Os 4 Deployments já têm `requests: { cpu: "250m" }`.
 
-**RESULTADO — `get hpa -w` durante a rampa de 1000 VUs**:
+**RESULTADO — `get hpa -w` durante a bateria k6** _(capturado 2026-07-13, cenário `hpa`)_ — o
+requisito §3(d.i) do enunciado, **criação automática de pods**, ao vivo: o `api-gateway` estoura o
+alvo (`cpu: 163%/60%`) e o HPA sobe `REPLICAS` de 1 → 3; os demais serviços seguem abaixo do alvo e
+ficam em 1 réplica:
 
-```
-(pendente)
-```
+![kubectl get hpa -w — CPU estourando o alvo e réplicas subindo](imagens/hpa.png)
+
+![kubectl get hpa -w — continuação: api-gateway estabiliza em 3 réplicas](imagens/hpa2.png)
 
 ### 4b. Série temporal (pods × tempo) — o gráfico-assinatura da fase (d)
 
-`kubectl get hpa -w` gera texto, não dado. Para o gráfico 6 do roteiro (§4.9 — *nº de pods × tempo
-sobreposto à carga*) é preciso amostrar. Rodar **em background, antes** de o Carlos disparar a rampa:
+`kubectl get hpa -w` gera texto, não dado. Para o gráfico *nº de pods × tempo
+sobreposto à carga* é preciso amostrar. Rodar **em background, antes** de disparar a rampa:
 
 ```bash
 make watch-hpa SCENARIO=hpa &
@@ -218,18 +200,24 @@ kill %1
 
 Gera `docs/evidencias/hpa-timeline.csv` com
 `ts_utc,elapsed_s,scenario,deployment,replicas,ready,cpu_pct,desired`. Rodadas de cenários
-diferentes acumulam no mesmo arquivo, distinguidas pela coluna `scenario` — o `plot.py` do Carlos
+diferentes acumulam no mesmo arquivo, distinguidas pela coluna `scenario` — o `loadtest/plot.py`
 filtra por ela.
 
 Vale rodar **também** nos cenários de réplica fixa: o CSV então prova que a contagem **não** variou
 durante a bateria (`replicas` constante, `cpu_pct` vazio), o que valida "mesmas condições de teste"
 exigido pelo enunciado.
 
-**RESULTADO — `hpa-timeline.csv`** _(colar as primeiras e as últimas linhas; o arquivo inteiro vai
-versionado)_:
+**RESULTADO — `hpa-timeline.csv`** _(capturado 2026-07-13, cenário `hpa`, 652 amostras/~15 min;
+arquivo inteiro versionado nesta pasta)_:
 
 ```
-(pendente)
+ts_utc,elapsed_s,scenario,deployment,replicas,ready,cpu_pct,desired
+2026-07-13T00:41:02Z,0,hpa,api-gateway,3,3,,
+2026-07-13T00:41:02Z,0,hpa,authorization,3,3,,
+...
+2026-07-13T00:55:34Z,872,hpa,authorization,1,1,1,1
+2026-07-13T00:55:34Z,872,hpa,patient-data,1,1,1,1
+2026-07-13T00:55:34Z,872,hpa,data-transform,1,1,1,1
 ```
 
 > Repare na coluna `ready` × `replicas`: a distância entre as duas é o **cold-start da JVM** (§7.2).
@@ -261,20 +249,13 @@ Mitigação aplicada no `k8s/base/api-gateway.yaml`:
 ```bash
 # tempo até Ready dos pods criados pelo HPA
 kubectl get events --sort-by=.lastTimestamp | grep -E 'Scheduled|Started|Ready'
-# latência p95 no mesmo eixo temporal (Prometheus / painel do Guilherme)
+# latência p95 no mesmo eixo temporal (painel RED do Grafana)
 ```
 
-**RESULTADO — tempo `Scheduled` → `Ready`**:
-
-```
-(pendente)
-```
-
-**RESULTADO — p95 ao longo da rampa** (esperado: **piora** enquanto os pods sobem, depois melhora):
-
-```
-(pendente)
-```
+**RESULTADO** — o efeito aparece no `hpa-timeline.csv` (§4b): a distância entre as colunas
+`replicas` e `ready` de cada amostra é o cold-start (pod contado em `replicas` mas ausente de
+`ready` está subindo e não atende ninguém). O resumo k6 do cenário `hpa` está em
+`imagens/hpa10vh.png` / `hpa50vh*.png` e nos summaries `loadtest/out/hpa_vus*.json`.
 
 > **Leitura para o relatório.** O autoscaling não é gratuito nem instantâneo. Sob rampa rápida, a
 > latência piora antes de melhorar: os pods novos consomem CPU do nó para subir a JVM enquanto ainda
@@ -306,6 +287,5 @@ make demo DEMO_FRESH=1      # cluster do zero → deploy → seed → smoke das 
   OK  medico sem vínculo -> DENY (403)
 ```
 
-> ⚠️ Nesta rodada foi `make demo` (cluster já de pé), **não** `make demo DEMO_FRESH=1` do zero — o
-> Portão 7 (replicabilidade do zero para o professor) continua a rodar ao menos uma vez.
-> Pré-requisito descoberto: o smoke usa `jq`; instalar na WSL (`apt-get install -y jq`) antes.
+> Nesta rodada foi `make demo` (cluster já de pé); `DEMO_FRESH=1` recria o cluster do zero.
+> Pré-requisito: o smoke usa `jq` (`apt-get install -y jq` na WSL).

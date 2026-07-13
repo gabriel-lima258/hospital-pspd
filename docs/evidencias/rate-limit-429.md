@@ -1,4 +1,4 @@
-# Rate limiting — 429 sob rajada (Portão 4, exigência do enunciado)
+# Rate limiting — 429 sob rajada (exigência do enunciado)
 
 > Capturado 2026-07-10. Gateway com `RateLimitFilter` (token bucket por usuário, `capacity=50`,
 > `refill-per-second=25`, defaults do `application.yml`). Ver `docs/contratos.md` (seção rate limiting).
