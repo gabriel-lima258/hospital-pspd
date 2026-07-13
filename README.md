@@ -17,7 +17,7 @@ Uma requisição REST autenticada (JWT) chega ao Gateway e atravessa três servi
 recurso FHIR, respeitando o nível de acesso do perfil do usuário:
 
 ```
-Frontend (React/Next)
+Frontend (React/Vite)
         │  REST/HTTPS  + JWT (Keycloak)
         ▼
    api-gateway ──────────────► authorization    (ALLOW/DENY + nível de acesso)
@@ -71,7 +71,7 @@ Promtail** (`make loki`) · Carga: **k6** · Tracing (extra): OpenTelemetry + Te
 - **JDK 21** (o Gradle é resolvido pelo wrapper — não precisa instalar Gradle)
 - **Docker** + **Docker Compose v2**
 - `psql` (cliente, opcional — para inspecionar o banco)
-- Para as fases de cluster: `kubectl`, `kind`, `k6`, `python3`
+- Para as fases de cluster: `kubectl`, `kind`, `helm`, `k6`, `jq`, `python3`
 
 ---
 
@@ -83,7 +83,7 @@ Promtail** (`make loki`) · Carga: **k6** · Tracing (extra): OpenTelemetry + Te
 proto/            # contrato gRPC (fonte da verdade) — módulo Gradle :proto
 db/               # schema.sql · seed.py · seed-min.sql
 services/         # api-gateway · authorization · patient-data · data-transform
-frontend/         # React/Next (futuro)
+frontend/         # SPA React/Vite (real: OIDC + 3 jornadas; roda no cluster via k8s/base/frontend.yaml)
 k8s/              # base/ (Deployments, Services, headless) · hpa/ · observability/ · jobs/
 loadtest/         # k6/scenario.js, gen-tokens.sh, run-load-tests.sh, collect-metrics.sh, plot.py
 keycloak/         # realm-export.json + get-token.sh
@@ -136,7 +136,7 @@ falam entre si pela rede do compose (gRPC em `:9090`, HTTP/actuator em `:8080`).
 
 
 
-### As 3 jornadas (M2)
+### As 3 jornadas
 
 Toda requisição atravessa Gateway → Authorization → Patient Data → Postgres → Data Transform.
 O **nível autorizado decide a forma da saída** — não é anotação, é enforcement.
@@ -187,7 +187,7 @@ psql -h localhost -p 5433 -U app -d hospital -c '\dt'   # senha: app
 
 ### Autenticação (Keycloak)
 
-Realm `hospital` importado de `[keycloak/realm-export.json](keycloak/realm-export.json)` no boot do
+Realm `hospital` importado de [`keycloak/realm-export.json`](keycloak/realm-export.json) no boot do
 container. Console admin em [http://localhost:8080](http://localhost:8080) (`admin`/`admin`). Usuários de teste (senha
 `senha123`):
 
@@ -207,7 +207,7 @@ keycloak/get-token.sh med.cardoso        # imprime o access_token (TTL ~30 min)
 # parametrizável: KC_HOST / KC_PORT / KC_REALM / KC_CLIENT
 ```
 
-Detalhes dos claims em `[docs/contratos.md](docs/contratos.md)`. Para recriar o realm do zero:
+Detalhes dos claims em [`docs/contratos.md`](docs/contratos.md). Para recriar o realm do zero:
 `docker compose up -d --force-recreate keycloak`.
 
 ---
@@ -231,12 +231,15 @@ Detalhes dos claims em `[docs/contratos.md](docs/contratos.md)`. Para recriar o 
 | `make tracing` / `tracing-off`              | **(bônus)** Tempo + OTel agent: liga/desliga traces `REST→gRPC→SQL` no Grafana (trace→log)      | ✅        |
 | `make seed`                                 | Semeia o **cluster** via Job k8s (`SCALE=50000`, `seed=42`, `COPY`) — ~50k pacientes, ~1–2M eventos | ✅        |
 | `make seed-local`                           | Semeia o banco do **compose** (`localhost:5433`) via venv Python. `SCALE=` ajusta o volume     | ✅        |
-| `make deploy`                               | Build das imagens + `kind load` + aplica `k8s/base` e `k8s/observability` (**não** o HPA)        | ✅        |
+| `make deploy`                               | Build das imagens (4 serviços + frontend) + `kind load` + aplica `k8s/base` e `k8s/observability` (**não** o HPA) | ✅        |
+| `make redeploy`                             | Rebuild + `kind load` + `rollout restart` dos 4 serviços + frontend (obrigatório se o proto mudou) | ✅        |
+| `make forward` / `make forward-stop`        | Sobe/derruba os 3 port-forwards do frontend real (keycloak:8080, gateway:9000, frontend:8088)   | ✅        |
+| `make front`                                | Port-forward só do frontend em [http://localhost:8088](http://localhost:8088)                   | ✅        |
 | `make scale N=3`                            | Fixa as réplicas dos 4 serviços e espera todas ficarem Ready                                    | ✅        |
 | `make pods-wide`                            | `kubectl get pods -o wide` — distribuição dos pods entre os workers                             | ✅        |
 | `make watch-hpa SCENARIO=hpa`               | Amostra réplicas/CPU dos 4 serviços num CSV. Rode **em background** durante a rampa do k6        | ✅        |
 | `make grpc-lb-on`                           | gRPC balanceado: Service headless + `round_robin` (é o default)                                 | ✅        |
-| `make grpc-lb-off`                          | gRPC pinado em 1 pod: ClusterIP + `pick_first` — o "antes" do §7.3                              | ✅        |
+| `make grpc-lb-off`                          | gRPC pinado em 1 pod: ClusterIP + `pick_first` — o "antes" da descoberta de balanceamento (RELATORIO §9.3) | ✅        |
 | `make hpa-on` / `make hpa-off`              | Aplica/remove o HPA (`k8s/hpa/`, min 1 / max 10 / CPU 60%)                                      | ✅        |
 | `make demo`                                 | Deploy + seed enxuto + smoke das 3 jornadas. `DEMO_FRESH=1` recria o cluster do zero            | ✅        |
 | `make load SCENARIO=1replica|3replicas-off|3replicas-on|hpa` | Bateria k6 (10/50/100/500/1000 VUs) — ver `loadtest/README.md`                  | ✅        |
@@ -244,17 +247,17 @@ Detalhes dos claims em `[docs/contratos.md](docs/contratos.md)`. Para recriar o 
 | `make help`                                 | Lista os alvos                                                                                  | ✅        |
 
 
-### Cenários de teste (interface entre Trilha A e Trilha D)
+### Cenários de teste (usados pelo `make load`)
 
 O `loadtest/run-load-tests.sh` prepara o cluster com estes alvos antes de cada bateria k6:
 
 
-| Cenário                        | Comandos                                                     |
-| ------------------------------ | ------------------------------------------------------------ |
-| `1replica`                     | `make hpa-off && make scale N=1`                             |
-| `3replicas` (§7.3 **antes**)   | `make grpc-lb-off && make hpa-off && make scale N=3`         |
-| `3replicas` (§7.3 **depois**)  | `make grpc-lb-on && make hpa-off && make scale N=3`          |
-| `hpa`                          | `make grpc-lb-on && make scale N=1 && make hpa-on`           |
+| Cenário                              | Comandos                                                     |
+| ------------------------------------ | ------------------------------------------------------------ |
+| `1replica`                           | `make hpa-off && make scale N=1`                             |
+| `3replicas-off` (gRPC **sem** LB)    | `make grpc-lb-off && make hpa-off && make scale N=3`         |
+| `3replicas-on` (gRPC balanceado)     | `make grpc-lb-on && make hpa-off && make scale N=3`          |
+| `hpa`                                | `make grpc-lb-on && make scale N=1 && make hpa-on`           |
 
 
 ⚠️ Não rode `kubectl apply -f k8s/base` no meio de um cenário — recria o estado. E `make hpa-off`
@@ -266,7 +269,7 @@ O `loadtest/run-load-tests.sh` prepara o cluster com estes alvos antes de cada b
 > `defaultLoadBalancingPolicy: round_robin` (já é o default do `net.devh` 3.1.0) não resolve — ele
 > faz round-robin sobre a lista devolvida pelo DNS, e essa lista tem 1 elemento. O fix é o **Service
 > headless** (`clusterIP: None`), em `k8s/base/grpc-headless.yaml`. `grpc-lb-off` reproduz o arranjo
-> quebrado para que a descoberta §7.3 tenha um "antes" medido.
+> quebrado para que a descoberta de balanceamento (RELATORIO §9.3) tenha um "antes" medido.
 
 
 Gradle:
@@ -283,10 +286,10 @@ Gradle:
 
 ## Contratos (mexeu, avise o grupo no mesmo dia)
 
-1. **Dados** — `[db/schema.sql](db/schema.sql)`: 5 tabelas + índices.
-2. **gRPC** — `[proto/hospital.proto](proto/hospital.proto)`: serviços Authorization / PatientData /
+1. **Dados** — [`db/schema.sql`](db/schema.sql): 5 tabelas + índices.
+2. **gRPC** — [`proto/hospital.proto`](proto/hospital.proto): serviços Authorization / PatientData /
   DataTransform. Stubs gerados pelo módulo `:proto`.
-3. **Identidade (JWT)** — `[docs/contratos.md](docs/contratos.md)`: claims `preferred_username` +
+3. **Identidade (JWT)** — [`docs/contratos.md`](docs/contratos.md): claims `preferred_username` +
   `realm_access.roles ∈ {MEDICO, ESTAGIARIO, PESQUISADOR}`.
 
 ---
@@ -369,12 +372,14 @@ frontend/src/
 │   └── ui/              # Componentes de base (DataTable, ExportButton, Modals, Toasts)
 ├── context/             # Provedores de contexto (AuthContext, ThemeContext, ToastContext)
 ├── hooks/               # Custom React hooks (useLocalStorage)
+├── lib/                 # Adapters FHIR→UI (cohort.ts: MeasureReport/Bundle → domínio)
 ├── layouts/             # Template da página principal (DashboardLayout)
 ├── pages/               # Páginas da aplicação (Dashboard, Patients, Profile, Settings)
 ├── routes/              # Configurações de rotas protegidas (ProtectedRoute)
 ├── services/            # Serviços de API e Configurações (api.ts, keycloak.ts, mockData.ts)
 ├── types/               # Tipagens TypeScript (fhir.ts)
 ├── utils/               # Utilitários auxiliares (history.ts, utils.ts)
+├── views/               # Telas compostas (prontuário, coorte)
 └── index.css            # Estilos globais e suporte ao Dark Mode
 ```
 
