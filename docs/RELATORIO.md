@@ -1,14 +1,14 @@
 # Relatório — Monitoramento/Observabilidade de Aplicações em Clusters K8S
 
 > **Universidade de Brasília (FGA) · PSPD — Programação para Sistemas Paralelos e Distribuídos**
-> Prof. Fernando W. Cruz · Data: 17/07/2026
+> Prof. Fernando W. Cruz · Data: 12/07/2026
 >
 > | Aluno   | Matrícula |
 > | ------- | --------- |
-> | Artur   | 231034082 |
-> | Mateus  | 211062240 |
-> | Gabriel | 222037610 |
-> | Carlos  | 222022064 |
+> | Artur Handow Krauspenhar |231034082 |
+> | Mateus Bastos dos Santos | 211062240 |
+> | Gabriel Lima da Silva | 222037610 |
+> | Carlos Eduardo de Souza Paz| 222022064 |
 
 Este documento segue a estrutura obrigatória do enunciado ([`EnunciadoTrabalho.md`](EnunciadoTrabalho.md), Seção 4).
 As evidências brutas (saídas de comando, prints, CSVs) estão em [`evidencias/`](evidencias/) e são
@@ -257,19 +257,33 @@ Pipeline de observabilidade completo — **métricas + logs + traces** correlaci
 
 ## 11. Conclusão
 
-[PREENCHER — texto conclusivo do grupo. Insumos: a escalabilidade horizontal funciona mas exige
-condições não óbvias (headless Service, requests.cpu, replicas omitido); o autoscaling tem custo
-transitório (cold-start); o limite final é o estado (Postgres); observabilidade com método RED/USE
-foi o que permitiu *ver* cada um desses efeitos. Dificuldades e soluções: diagnóstico errado inicial
-do balanceamento gRPC corrigido por análise do resolver DNS; `kind load` × attestation manifest
-(`--provenance=false`); split-horizon do issuer Keycloak para o login OIDC no browser.]
+O desenvolvimento e a validação experimental deste projeto evidenciaram com clareza que o ganho de resiliência e desempenho em arquiteturas distribuídas sob Kubernetes depende fortemente de ajustes de infraestrutura e rede detalhados. A partir dos testes e análises efetuados, o grupo consolida as seguintes conclusões:
+
+1. **Ajustes de Escalabilidade Horizontal:** A escalabilidade horizontal foi atingida com sucesso, mas revelou depender de pré-requisitos essenciais e sutis. Entre eles, destacam-se a obrigatoriedade da declaração de `requests.cpu` (sem a qual o HPA não consegue obter as métricas de utilização), a omissão voluntária da instrução `replicas` nos manifests principais de deployment (evitando retrocesso na quantidade de pods durante novas implantações) e, fundamentalmente, a utilização de um **headless Service** para o gRPC. Sem este último, a persistência de conexões HTTP/2 do gRPC causa um desbalanceamento severo, sobrecarregando uma única réplica.
+2. **Custo Transitório do Autoscaling (Cold-Start):** O escalonamento dinâmico via HPA demonstrou eficácia na acomodação do tráfego, porém o boot inicial dos microsserviços em Spring/JVM gera uma latência transitória perceptível antes de os novos pods se tornarem operacionais. A mitigação implementada reduziu o tempo de cache de DNS interno do Java, melhorando a agilidade de dispersão de carga para as réplicas novas.
+3. **Limitação de Estado (PostgreSQL):** Embora os microsserviços stateless escalem sem fricção, a camada persistente de banco de dados (PostgreSQL operando em réplica única) representa o gargalo definitivo sob estresse intenso.
+4. **Valor da Observabilidade:** A estruturação de métricas no Prometheus e visualizações no Grafana orientadas pelos métodos **RED** (Rate, Errors, Duration) e **USE** (Utilization, Saturation, Errors) foi vital. Apenas ao conseguir correlacionar o comportamento do sistema sob carga em tempo real foi possível diagnosticar precisamente esses padrões e limites de arquitetura.
+
+### Dificuldades e Soluções Encontradas
+
+- **Diagnóstico de balanceamento gRPC:** Inicialmente, houve um entendimento de que a biblioteca cliente não realizava balanceamento round-robin. Contudo, após inspeção das respostas DNS do resolve interno no cluster, identificou-se que o gargalo se originava no uso de um Service padrão com IP Virtual (ClusterIP). A resolução deu-se pela conversão para headless service.
+- **Carregamento de Imagens e Erros de Provenance:** Durante a execução de comandos `kind load image`, constatou-se falha na inicialização decorrente de manifests de atestação. A dificuldade foi superada gerando builds Docker Multi-arch limpos através do parâmetro `--provenance=false`.
+- **Split-Horizon no Keycloak:** A resolução de fluxos OAuth2/OIDC gerava conflito devido ao redirecionamento no browser em oposição à validação interna do gateway. A solução exigiu a configuração de split-horizon, permitindo que o emissor utilizase endereços de validação interna para chamadas inter-cluster e endereços externos legíveis pelo navegador do usuário.
 
 ### Comentários pessoais e autoavaliação
 
-- **Artur** — [PREENCHER: partes em que mais trabalhou, aprendizados, nota de autoavaliação]
-- **Mateus** — [PREENCHER]
-- **Gabriel** — [PREENCHER]
-- **Carlos** — [PREENCHER]
+- **Artur** : Atuei diretamente no desenvolvimento da Interface do Usuário (Frontend) e liderei a Engenharia de Performance (QA) do projeto. Fui responsável por garantir que a aplicação Web consumisse corretamente os fluxos de autenticação e exibisse as telas dinâmicas de acordo com o perfil do usuário logado. Na camada de infraestrutura, trabalhei junto com o Mateus na criação e automação dos scripts de teste de carga via k6, mapeando o comportamento do sistema desde 10 até 1000 usuários simultâneos, além de estruturar o dashboard do Grafana para monitoramento das métricas RED.
+  - **Aprendizados:** Compreensão aprofundada de ciclos de testes de estresse, análise de latência sob concorrência e integração frontend com provedores de identidade (OAuth2/OIDC).
+  - **Nota de autoavaliação:** 10/10.
+- **Mateus** : Minhas responsabilidades focaram na infraestrutura base do cluster Kubernetes, no desenvolvimento do Patient Data Service e na engenharia da camada de dados. Fui responsável por traduzir as especificações de tabelas e regras de negócio clínicas fornecidas no documento do projeto para a instância física do banco de dados PostgreSQL, realizando a criação e a população das tabelas necessárias. Adicionalmente, implementei a comunicação gRPC eficiente do microsserviço PatientData e configurei a topologia distribuída do cluster (1 Master + 3 Workers). Atuei fortemente junto com o Artur na execução das baterias de testes de carga com o k6 e no diagnóstico de rede do ambiente.
+  - **Aprendizados:** Domínio prático e aprofundado sobre testes de carga com o k6, compreendendo como o aumento progressivo do volume de usuários virtuais (VUs) tensiona o sistema e faz os gargalos de infraestrutura e rede emergirem na prática. Compreendi o ciclo de criação e comportamento dos pods sob estresse e como as limitações físicas da camada de transporte local se manifestam quando desafiadas por alta concorrência.
+  - **Nota de autoavaliação:** 10/10.
+- **Gabriel** : Fui responsável pela arquitetura central de segurança, autenticação e regras de negócio de acesso baseado em funções (RBAC). Atuei na configuração do servidor Keycloak para gerenciamento de identidades e emissão de tokens JWT contendo as roles específicas (Médico, Estagiário e Pesquisador). Desenvolvi o microsserviço de Autorização para validação lógica de escopos de acesso em gRPC (FULL, PARTIAL, ANONYMIZED e AGGREGATED) e fiz a amarração das rotas no API Gateway. Também colaborei na estruturação das métricas no Prometheus para a coleta de erros HTTP e gRPC.
+  - **Aprendizados:** Arquitetura de segurança em sistemas distribuídos, padronização de segurança fina baseada em tokens JWT e ciclo de vida de requisições inter-microsserviços via gRPC.
+  - **Nota de autoavaliação:** 10/10.
+- **Carlos** : Integrei o time focado na Interface do Usuário (Frontend) da aplicação hospitalar. Trabalhei no desenvolvimento dos componentes visuais e na lógica do cliente web para assegurar uma navegação fluida, garantindo que as tabelas transformadas e os recursos em formato HL7/FHIR retornados pela API Gateway fossem renderizados de forma legível e amigável para os diferentes atores do sistema (como médicos e pesquisadores).
+  - **Aprendizados:** Manipulação e exibição de dados clínicos complexos em formato JSON/FHIR, integração assíncrona com gateways REST e desenvolvimento colaborativo voltado para a experiência do usuário final.
+  - **Nota de autoavaliação:** 9.5/10.
 
 ## 12. Referências
 
